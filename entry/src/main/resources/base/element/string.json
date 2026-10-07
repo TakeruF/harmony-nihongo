@@ -1,0 +1,12 @@
+{
+  "string": [
+    {
+      "name": "ime_description",
+      "value": "日本語キーボードの初期試作"
+    },
+    {
+      "name": "subtype_label",
+      "value": "Harmony Nihongo"
+    }
+  ]
+}

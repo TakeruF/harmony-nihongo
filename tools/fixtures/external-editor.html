@@ -1,0 +1,23 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Harmony Nihongo external editor validation</title>
+<style>
+body{font:20px system-ui;margin:20px;background:#f6f7fb;color:#202338}
+label{display:block;margin:12px 0}input,textarea,[contenteditable]{box-sizing:border-box;width:100%;font:20px system-ui;padding:12px;border:1px solid #888;border-radius:8px;background:white}
+[contenteditable]{min-height:70px}output{display:block;white-space:pre-wrap;font-size:16px;position:sticky;top:0;background:#f6f7fb}
+</style>
+<h2>IME入力テスト</h2>
+<output id="result" aria-live="polite">idle</output>
+<label>単行<input id="single" aria-label="IME single" autocomplete="off"></label>
+<label>複数行<textarea id="multi" aria-label="IME textarea" rows="2"></textarea></label>
+<label>リッチテキスト<div id="rich" contenteditable="true" role="textbox" aria-label="IME rich"></div></label>
+<label>パスワード<input id="password" aria-label="IME password" type="password" autocomplete="off"></label>
+<script>
+document.querySelectorAll('input,textarea,[contenteditable]').forEach(field=>{
+field.addEventListener('input',()=>{
+document.querySelector('#result').textContent=field.type==='password'?'password length: '+field.value.length:field.id+'='+JSON.stringify(field.value??field.textContent);
+});
+});
+document.addEventListener('submit',event=>event.preventDefault());
+</script>

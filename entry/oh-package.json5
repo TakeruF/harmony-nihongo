@@ -1,0 +1,7 @@
+{
+  "name": "entry",
+  "version": "0.1.0",
+  "dependencies": {
+    "libnihongo.so": "file:./src/main/cpp/types/libnihongo"
+  }
+}

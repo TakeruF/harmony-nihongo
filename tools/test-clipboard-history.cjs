@@ -1,0 +1,12 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+const ts=require('/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/ets/build-tools/ets-loader/node_modules/typescript/lib/typescript.js');
+const e={};vm.runInNewContext(ts.transpileModule(fs.readFileSync('entry/src/main/ets/input/ClipboardHistory.ets','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText,{exports:e,Date});
+const h=new e.ClipboardHistory(),t=1000;
+assert.equal(h.remember('',t),undefined);assert.equal(h.remember('a'.repeat(16385),t),undefined);
+const value='  日本語\n👨‍👩‍👧‍👦❤️  ';h.remember(value,t);assert.equal(h.snapshot(t)[0].text,value);
+h.remember('other',t);h.remember(value,t+20);assert.equal(h.snapshot(t+20).length,2);assert.equal(h.snapshot(t+20)[0].text,value);
+for(let i=0;i<12;i++)h.remember(String(i),t+30);assert.equal(h.snapshot(t+30).length,10);assert.equal(h.snapshot(t+30).at(-1).text,'2');
+const items=h.snapshot(t+30);h.remove(items[0].id);assert.equal(h.snapshot(t+30).length,9);items.pop();assert.equal(h.snapshot(t+30).length,9);
+assert.equal(h.snapshot(t+30+3600000).length,0);
+h.remember('x',t);h.clear();assert.equal(h.snapshot(t).length,0);
+console.log('Clipboard: whitespace/Unicode intact, max length, deduplication/order, 10-item limit, expiry, removal, clear: PASS');

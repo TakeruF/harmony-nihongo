@@ -1,0 +1,11 @@
+const assert=require('node:assert/strict');
+const fs=require('node:fs');const vm=require('node:vm');
+const ts=require('/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/ets/build-tools/ets-loader/node_modules/typescript/lib/typescript.js');
+let timer=0;const pending=new Map();const exportsObject={};
+vm.runInNewContext(ts.transpileModule(fs.readFileSync('entry/src/main/ets/input/CursorHoldTracker.ets','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText,{exports:exportsObject,setTimeout:(fn,ms)=>{assert.equal(ms,450);pending.set(++timer,fn);return timer;},clearTimeout:id=>pending.delete(id)});
+const tracker=new exportsObject.CursorHoldTracker();let taps=0,holds=0;
+tracker.begin(1,()=>taps++,()=>holds++);assert.equal(taps,0);tracker.end(1,false);assert.equal(taps,1);assert.equal(holds,0);
+tracker.begin(2,()=>taps++,()=>holds++);const fn=pending.get(timer);fn();tracker.end(2,false);assert.equal(taps,1);assert.equal(holds,1);
+tracker.begin(3,()=>taps++,()=>holds++);const cancelled=pending.get(timer);tracker.end(3,true);cancelled();assert.equal(holds,1);assert.equal(taps,1);
+tracker.begin(4,()=>taps++,()=>holds++);tracker.begin(5,()=>taps++,()=>holds++);tracker.end(5,false);tracker.clear();assert.equal(taps,2);assert.equal(pending.size,0);
+console.log('Cursor hold: short press, one resize per hold, no extra movement, cancel, overlap, cleanup: PASS');

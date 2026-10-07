@@ -1,0 +1,12 @@
+cmake_minimum_required(VERSION 3.5.0)
+project(nihongo)
+if(DEFINED PACKAGE_FIND_FILE)
+  include(${PACKAGE_FIND_FILE})
+endif()
+add_library(nihongo SHARED napi_init.cpp)
+set_target_properties(nihongo PROPERTIES CXX_STANDARD 20 CXX_STANDARD_REQUIRED ON)
+target_link_libraries(nihongo PUBLIC libace_napi.z.so)
+
+add_library(nihongo_engine SHARED IMPORTED)
+set_target_properties(nihongo_engine PROPERTIES IMPORTED_NO_SONAME TRUE IMPORTED_LOCATION "${CMAKE_CURRENT_SOURCE_DIR}/../../../../.native-build/libnihongo_engine.so")
+target_link_libraries(nihongo PRIVATE nihongo_engine)

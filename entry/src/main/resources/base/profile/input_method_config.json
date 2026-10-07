@@ -1,0 +1,11 @@
+{
+  "subtypes": [
+    {
+      "icon": "$media:app_icon",
+      "id": "nihongo",
+      "label": "$string:subtype_label",
+      "locale": "ja-JP",
+      "mode": "lower"
+    }
+  ]
+}
