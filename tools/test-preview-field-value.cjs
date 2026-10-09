@@ -1,0 +1,10 @@
+const assert = require('node:assert/strict'), fs = require('node:fs'), vm = require('node:vm');
+const ts = require('/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/ets/build-tools/ets-loader/node_modules/typescript/lib/typescript.js');
+const api = {};
+vm.runInNewContext(ts.transpileModule(fs.readFileSync('entry/src/main/ets/input/PreviewFieldValue.ets','utf8'), {compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText,{exports:api});
+const bind = api.previewFieldValue;
+assert.equal(bind('', 'え', 0), 'え'); assert.equal(bind('今日は'), '今日は');
+assert.equal(bind('前後', 'かな', 1), '前かな後'); assert.equal(bind('😀後', 'か', 2), '😀か後');
+assert.equal(bind('本文', '', 1), '本文'); assert.equal(bind('本文', 'かな', 2), '本文かな');
+assert.equal(bind('本文', 'かな', -1), '本文'); assert.equal(bind('本文', 'かな', 3), '本文');
+console.log('ArkUI field binding: committed text plus preview, UTF-16 cursor offset, finish/cancel and invalid offsets: PASS');

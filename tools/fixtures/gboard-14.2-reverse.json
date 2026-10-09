@@ -1,0 +1,37 @@
+[
+  {
+    "scenario": "two-tap-keys",
+    "before": "あか",
+    "undos": [
+      "あこ",
+      "あけ"
+    ]
+  },
+  {
+    "scenario": "flick-left",
+    "before": "い",
+    "undos": [
+      "い",
+      "い",
+      "い"
+    ]
+  },
+  {
+    "scenario": "modifier",
+    "before": "が",
+    "undos": [
+      "が",
+      "が",
+      "が"
+    ]
+  },
+  {
+    "scenario": "alphabet",
+    "before": "a",
+    "undos": [
+      "2",
+      "C",
+      "B"
+    ]
+  }
+]

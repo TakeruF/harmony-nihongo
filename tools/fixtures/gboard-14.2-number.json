@@ -1,0 +1,122 @@
+[
+  {
+    "key": "1",
+    "directions": {
+      "center": "1",
+      "left": "☆",
+      "up": "♪",
+      "right": "→",
+      "down": ""
+    }
+  },
+  {
+    "key": "2",
+    "directions": {
+      "center": "2",
+      "left": "¥",
+      "up": "$",
+      "right": "€",
+      "down": ""
+    }
+  },
+  {
+    "key": "3",
+    "directions": {
+      "center": "3",
+      "left": "%",
+      "up": "゜",
+      "right": "#",
+      "down": ""
+    }
+  },
+  {
+    "key": "4",
+    "directions": {
+      "center": "4",
+      "left": "○",
+      "up": "*",
+      "right": "・",
+      "down": ""
+    }
+  },
+  {
+    "key": "5",
+    "directions": {
+      "center": "5",
+      "left": "+",
+      "up": "×",
+      "right": "÷",
+      "down": ""
+    }
+  },
+  {
+    "key": "6",
+    "directions": {
+      "center": "6",
+      "left": "<",
+      "up": "=",
+      "right": ">",
+      "down": ""
+    }
+  },
+  {
+    "key": "7",
+    "directions": {
+      "center": "7",
+      "left": "「",
+      "up": "」",
+      "right": ":",
+      "down": ""
+    }
+  },
+  {
+    "key": "8",
+    "directions": {
+      "center": "8",
+      "left": "〒",
+      "up": "々",
+      "right": "〆",
+      "down": ""
+    }
+  },
+  {
+    "key": "9",
+    "directions": {
+      "center": "9",
+      "left": "^",
+      "up": "|",
+      "right": "\\",
+      "down": ""
+    }
+  },
+  {
+    "key": "brackets",
+    "directions": {
+      "center": "(",
+      "left": ")",
+      "up": "[",
+      "right": "]",
+      "down": ""
+    }
+  },
+  {
+    "key": "0",
+    "directions": {
+      "center": "0",
+      "left": "〜",
+      "up": "…",
+      "right": "@",
+      "down": ""
+    }
+  },
+  {
+    "key": "punct",
+    "directions": {
+      "center": ".",
+      "left": ",",
+      "up": "-",
+      "right": "/",
+      "down": ""
+    }
+  }
+]

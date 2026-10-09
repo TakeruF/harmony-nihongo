@@ -5,11 +5,14 @@ const path = require('node:path');
 const vm = require('node:vm');
 const ts = require('/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/ets/build-tools/ets-loader/node_modules/typescript/lib/typescript.js');
 const storage = new Map();
+const settingFlags = new Map();
 const noop = () => {};
+const deviceInfo = {sdkApiVersion:21};
+let screen = {id:0,width:1320,height:2856,densityPixels:3.5};
 const api = {SecurityMode:{FULL:1,BASIC:0},PATTERN_TEXT:0,PATTERN_NULL:-1,getKeyboardDelegate:()=>({on:noop,off:noop}),getInputMethodAbility:()=>({on:noop,off:noop,getSecurityMode:()=>0})};
 Object.assign(api,{ENTER_KEY_TYPE_GO:1,ENTER_KEY_TYPE_SEARCH:2,ENTER_KEY_TYPE_SEND:3,
   ENTER_KEY_TYPE_NEXT:4,ENTER_KEY_TYPE_DONE:5,ENTER_KEY_TYPE_PREVIOUS:6,ENTER_KEY_TYPE_NEWLINE:7,
-  PATTERN_NUMBER:1,PATTERN_PHONE:3,PATTERN_DATETIME:4});
+  PATTERN_NUMBER:1,PATTERN_PHONE:3,PATTERN_DATETIME:4,PanelFlag:{FLG_FIXED:1}});
 const cache = new Map();
 let fakeTimerId=0;const fakeTimers=new Map();
 function load(file) {
@@ -19,10 +22,11 @@ function load(file) {
   const requireMock = name => {
     if(name==='@kit.IMEKit') return {inputMethodEngine:api};
     if(name==='@kit.PerformanceAnalysisKit') return {hilog:{info:noop,error:noop}};
-    if(name==='@kit.ArkUI') return {};
+    if(name==='@kit.ArkUI') return {display:{getDefaultDisplaySync:()=>screen}};
+    if(name==='@kit.BasicServicesKit') return {deviceInfo};
     if(name==='@kit.CoreFileKit') return {fileIo:{}};
     if(name==='libnihongo.so') return {add:(a,b)=>a+b,echo:text=>text};
-    if(name==='./KeyboardSettings') return {keyboardSettings:{enabled:()=>true,refresh:noop}};
+    if(name==='./KeyboardSettings') return {keyboardSettings:{enabled:key=>settingFlags.get(key) ?? true,refresh:noop}};
     if(name.startsWith('@kit.')) return {};
     return load(path.join(path.dirname(file),name+'.ets'));
   };
@@ -64,6 +68,35 @@ const client={
 function attach(){c.active=true;c.onStart({hide:async()=>{}},client);preview='';committed='';finishes=0;inserts=0;}
 async function type(text){for(const ch of text)c.kanaInput(ch,c.sessionId);await c.queue;}
 (async()=>{
+  const {SettingsValues}=load('entry/src/main/ets/input/SettingsValues.ets');
+  settingFlags.set('imeFlickOnly',new SettingsValues().flickOnly);
+  attach();
+  const aKey=['あ','い','う','え','お'];
+  c.kanaInput('あ',c.sessionId,aKey,1000);c.kanaInput('あ',c.sessionId,aKey,1200);await c.queue;
+  assert.equal(preview,'い');
+  c.kanaInput('あ',c.sessionId,aKey,1900);await c.queue;assert.equal(preview,'いあ');
+  c.kanaInput('お',c.sessionId,[],1950);await c.queue;assert.equal(preview,'いあお');
+  settingFlags.set('imeFlickOnly',true);attach();
+  c.kanaInput('あ',c.sessionId,aKey,1000);c.kanaInput('あ',c.sessionId,aKey,1200);await c.queue;
+  assert.equal(preview,'ああ');
+  settingFlags.clear();
+  console.log('Gboard default: repeated taps cycle, pause starts next kana, flick inserts, flick-only opt-in: PASS');
+  settingFlags.set('imeFlickOnly',false);attach();
+  c.kanaInput('あ',c.sessionId,aKey,1000);await c.queue;assert.equal(storage.get('imeCanReverse'),true);
+  c.reverseKana();await c.queue;assert.equal(preview,'お');assert.equal(committed,'');
+  c.kanaInput('い',c.sessionId,[],1200);await c.queue;assert.equal(storage.get('imeCanReverse'),false);
+  c.reverseKana();await c.queue;assert.equal(preview,'おい');
+  attach();c.kanaInput('あ',c.sessionId,aKey,1000);await c.queue;
+  c.reverseKana();c.onStop();await c.queue;assert.equal(committed,'');assert.equal(storage.get('imeCanReverse'),false);
+  settingFlags.clear();
+  console.log('Reverse controller: preview only, flick disables, stopped editor ignores queued reverse: PASS');
+  const cursorBeforeTransient = client.getTextIndexAtCursor;
+  let cursorReads = 0;
+  client.getTextIndexAtCursor = async () => { if (++cursorReads === 1) throw {code:12800003}; return 0; };
+  attach();await c.queue;assert.equal(c.kana.supported,true);
+  c.kanaInput('あ',c.sessionId);await c.queue;assert.equal(preview,'あ');assert.equal(inserts,0);assert.equal(cursorReads,2);
+  client.getTextIndexAtCursor = cursorBeforeTransient;
+  console.log('Editor startup: transient cursor error preserves preview support and next input retries reading only: PASS');
   attach();c.onEditorAttribute({enterKeyType:7});assert.equal(storage.get('imeEnterLabel'),'改行');
   c.onEditorAttribute({enterKeyType:2});assert.equal(storage.get('imeEnterLabel'),'検索');
   c.onEditorAttribute({enterKeyType:3});assert.equal(storage.get('imeEnterLabel'),'送信');
@@ -273,4 +306,34 @@ async function type(text){for(const ch of text)c.kanaInput(ch,c.sessionId);await
   console.log('Reconversion: selected range only, cancel restores original, fallback/failed insert, changed selection/text/client, failed read: PASS');
   console.log('Segments: multiple choices, focused context, one commit, cancel/delete, next kana, fallback/failure, stale response/editor: PASS');
   console.log('80 queued kana, stale conversion/click, preview/fallback commit, failed commit retention, editor generation: PASS');
+  let layout, resized, getInsets;
+  const panel={adjustPanelRect:(flag,rect)=>{assert.equal(flag,1);layout=rect;},resize:async(w,h)=>{resized=[w,h];},getSystemPanelCurrentInsets:async()=>({left:0,right:0,bottom:157})};
+  c.panel=panel;c.active=true;await c.resizePanel();
+  assert(storage.get('imePopupInset')>0);
+  const {KeyboardMetrics}=load('entry/src/main/ets/ime/KeyboardMetrics.ets');
+  assert.equal(storage.get('imeKeyboardHeight'),new KeyboardMetrics(1320/3.5,2856/3.5).panelHeight);
+  for(const direction of ['portrait','landscape']) {
+    const rect=layout[direction+'Rect'], region=layout[direction+'InputRegion'][0];
+    assert.equal(region.top,layout[direction+'AvoidY']);
+    assert.equal(rect.height-region.top-region.height,157);
+    assert(rect.height-region.top<=(direction==='portrait'?2856:1320)*.7);
+  }
+  screen={...screen,width:2856,height:1320};panel.getSystemPanelCurrentInsets=async()=>({left:262,right:262,bottom:73});await c.resizePanel();
+  assert.equal(layout.landscapeRect.width,2856);
+  assert.equal(layout.landscapeInputRegion[0].left,262);assert.equal(layout.landscapeInputRegion[0].width,2856-524);
+  assert.equal(storage.get('imePanelLeft'),262/3.5);assert.equal(storage.get('imePanelRight'),262/3.5);
+  assert.equal(storage.get('imeKeyboardHeight'),new KeyboardMetrics((2856-524)/3.5,1320/3.5).panelHeight);
+  screen={...screen,width:1320,height:2856};panel.getSystemPanelCurrentInsets=async()=>({left:0,right:0,bottom:157});await c.resizePanel();
+  assert.equal(storage.get('imePanelLeft'),0);assert.equal(storage.get('imeKeyboardHeight'),new KeyboardMetrics(1320/3.5,2856/3.5).panelHeight);
+  screen={...screen,width:2856,height:1320};
+  deviceInfo.sdkApiVersion=12;await c.resizePanel();assert.equal(storage.get('imePopupInset'),0);assert.equal(resized[0],2856);
+  deviceInfo.sdkApiVersion=21;getInsets=panel.getSystemPanelCurrentInsets;
+  panel.getSystemPanelCurrentInsets=async()=>{throw {code:801};};
+  await c.resizePanel();assert.equal(storage.get('imePopupInset'),0);assert.equal(resized[0],2856);
+  panel.getSystemPanelCurrentInsets=getInsets;
+  panel.getSystemPanelCurrentInsets=()=>new Promise(resolve=>{getInsets=resolve;});
+  const pendingLayout=c.resizePanel();await Promise.resolve();await Promise.resolve();
+  const oldLayout=layout;c.panel=undefined;c.lifecycle++;getInsets({left:0,right:0,bottom:157});await pendingLayout;assert.equal(layout,oldLayout);
+  console.log('IME panel: transparent popup area, editor avoid line, OS buttons, rotation, old SDK fallback, stopped panel: PASS');
+
 })().catch(e=>{console.error(e);process.exitCode=1;});

@@ -43,6 +43,9 @@ const { SettingsValues } = load('SettingsValues');
 const settings = new SettingsValues();
 assert.equal(settings.valid(),true);
 assert.equal(settings.haptics,true);
+// Gboard 14.2 Japanese 12-key defaults to combined flick/toggle input.
+assert.equal(settings.flickOnly,false);
+assert.equal(settings.keitaiOnly,false);
 settings.set('imeHaptics',false); assert.equal(settings.haptics,false);
 settings.haptics='invalid'; assert.equal(settings.valid(),false);
 settings.haptics=true;
@@ -56,3 +59,53 @@ c.tap(['か','き','く','け','こ'],2700); assert.equal(c.reading,'きかか')
 c.transform('variant'); assert.equal(c.reading,'きかが');
 c.clear(); c.insert('つ'); c.transform('variant'); assert.equal(c.reading,'っ'); c.transform('variant'); assert.equal(c.reading,'づ');
 console.log('Combined modifier, keitai timing, exclusive settings, malformed values: PASS');
+
+const {TwelveKeyLayout}=load('TwelveKeyLayout');
+const reference=JSON.parse(fs.readFileSync(path.join(__dirname,'fixtures/gboard-14.2-alphabet.json'),'utf8'));
+const groups=TwelveKeyLayout.alphabet.flat().concat([TwelveKeyLayout.quotes,TwelveKeyLayout.alphabetPunctuation]);
+const directions=[[0,0],[-30,0],[0,-30],[30,0],[0,30]];
+assert.equal(reference.length,groups.length);
+for(let index=0;index<groups.length;index++) {
+  const group=groups[index];
+  const recorded=Object.values(reference[index].directions);
+  for(let direction=0;direction<5;direction++) {
+    const tracker=new FlickTracker();tracker.begin(1,group.values,100,100,1);
+    const [dx,dy]=directions[direction];
+    const actual=tracker.end(1,100+dx,100+dy).map(x=>x.value).join('');
+    assert.equal(actual,recorded[direction],reference[index].key+': '+Object.keys(reference[index].directions)[direction]);
+  }
+}
+c.clear();c.insert('a');c.transform('case');assert.equal(c.reading,'A');c.transform('case');assert.equal(c.reading,'a');
+c.clear();c.insert('か');c.transform('case');assert.equal(c.reading,'か');
+console.log('55 Gboard-recorded alphabet gestures, blank-direction cancellation, letter case: PASS');
+
+const numberReference=JSON.parse(fs.readFileSync(path.join(__dirname,'fixtures/gboard-14.2-number.json'),'utf8'));
+const numberGroups=TwelveKeyLayout.numbers.flat().concat([TwelveKeyLayout.brackets,TwelveKeyLayout.zero,TwelveKeyLayout.numberPunctuation]);
+for(let index=0;index<numberGroups.length;index++) {
+  for(let direction=0;direction<5;direction++) {
+    const tracker=new FlickTracker();tracker.begin(1,numberGroups[index].values,100,100,1);
+    const [dx,dy]=directions[direction];
+    assert.equal(tracker.end(1,100+dx,100+dy).map(x=>x.value).join(''),Object.values(numberReference[index].directions)[direction]);
+  }
+}
+console.log('60 Gboard-recorded number/symbol gestures, exact Unicode and blank directions: PASS');
+
+const tapReference=JSON.parse(fs.readFileSync(path.join(__dirname,'fixtures/gboard-14.2-tap-cycles.json'),'utf8'));
+for(const [index,group] of [groups[1],groups[0],TwelveKeyLayout.quotes].entries()) {
+  const tapValues=TwelveKeyLayout.alphabetTapValues(group.values);
+  for(let count=1;count<=tapReference[index].cycles.length;count++) {
+    c.clear();for(let tap=0;tap<count;tap++)c.tap(tapValues,1000+tap*100);
+    assert.equal(c.reading,tapReference[index].cycles[count-1],tapReference[index].key+' taps='+count);
+  }
+}
+console.log('21 recorded Gboard tap cycles: lowercase, uppercase, digits, punctuation: PASS');
+
+const reverse = new KanaComposition();
+reverse.tap(['あ','い','う','え','お'], 1000); reverse.tap(['か','き','く','け','こ'], 2000);
+assert.equal(reverse.canReverse, true); reverse.reverseTap(3000); assert.equal(reverse.reading, 'あこ');
+reverse.reverseTap(4000); assert.equal(reverse.reading, 'あけ');
+reverse.clear(); reverse.insert('い'); reverse.reverseTap(); assert.equal(reverse.reading, 'い'); assert.equal(reverse.canReverse, false);
+reverse.clear(); reverse.tap(['か','き','く','け','こ'], 1000); reverse.transform('variant'); reverse.reverseTap(); assert.equal(reverse.reading, 'が');
+reverse.clear(); reverse.tap(['a','b','c','A','B','C','2'], 1000);
+for (const value of ['2','C','B']) { reverse.reverseTap(); assert.equal(reverse.reading, value); }
+console.log('Gboard reverse key: tap cycle backwards, flick and transformed text unchanged: PASS');

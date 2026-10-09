@@ -1,0 +1,112 @@
+[
+  {
+    "key": "あ",
+    "directions": {
+      "center": "あ",
+      "left": "い",
+      "up": "う",
+      "right": "え",
+      "down": "お"
+    }
+  },
+  {
+    "key": "か",
+    "directions": {
+      "center": "か",
+      "left": "き",
+      "up": "く",
+      "right": "け",
+      "down": "こ"
+    }
+  },
+  {
+    "key": "さ",
+    "directions": {
+      "center": "さ",
+      "left": "し",
+      "up": "す",
+      "right": "せ",
+      "down": "そ"
+    }
+  },
+  {
+    "key": "た",
+    "directions": {
+      "center": "た",
+      "left": "ち",
+      "up": "つ",
+      "right": "て",
+      "down": "と"
+    }
+  },
+  {
+    "key": "な",
+    "directions": {
+      "center": "な",
+      "left": "に",
+      "up": "ぬ",
+      "right": "ね",
+      "down": "の"
+    }
+  },
+  {
+    "key": "は",
+    "directions": {
+      "center": "は",
+      "left": "ひ",
+      "up": "ふ",
+      "right": "へ",
+      "down": "ほ"
+    }
+  },
+  {
+    "key": "ま",
+    "directions": {
+      "center": "ま",
+      "left": "み",
+      "up": "む",
+      "right": "め",
+      "down": "も"
+    }
+  },
+  {
+    "key": "や",
+    "directions": {
+      "center": "や",
+      "left": "（",
+      "up": "ゆ",
+      "right": "）",
+      "down": "よ"
+    }
+  },
+  {
+    "key": "ら",
+    "directions": {
+      "center": "ら",
+      "left": "り",
+      "up": "る",
+      "right": "れ",
+      "down": "ろ"
+    }
+  },
+  {
+    "key": "わ",
+    "directions": {
+      "center": "わ",
+      "left": "を",
+      "up": "ん",
+      "right": "ー",
+      "down": "〜"
+    }
+  },
+  {
+    "key": "、",
+    "directions": {
+      "center": "、",
+      "left": "。",
+      "up": "？",
+      "right": "！",
+      "down": "…"
+    }
+  }
+]

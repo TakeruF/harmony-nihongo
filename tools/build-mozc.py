@@ -90,5 +90,6 @@ for dep in ['abseil-cpp+', 'protobuf+', 'zlib+', 're2+', '+http_archive+ja_usage
 output = 'Harmony Nihongo uses Mozc OSS ' + REVISION + '\n\n'
 for notice in notices:
     output += '\n===== ' + str(notice.relative_to(SOURCE) if notice.is_relative_to(SOURCE) else notice.relative_to(ext)) + ' =====\n' + notice.read_text() + '\n'
-(raw / 'third-party-notices.txt').write_text(output)
+output += '\n--- Unicode Emoji 15.1 / CLDR 44 ---\n' + (ROOT / 'licenses/UNICODE-LICENSE.txt').read_text()
+(raw / 'third-party-notices.txt').write_text(output.rstrip() + '\n')
 print('Mozc build ready:', CACHE / 'libnihongo_engine.so')

@@ -1,3 +1,4 @@
+import { KeyboardPalette } from './KeyboardPalette';
 import { pasteboard, BusinessError } from '@kit.BasicServicesKit';
 import { clipboardHistory, ClipboardItem } from '../input/ClipboardHistory';
 import { imeController } from './ImeController';
@@ -55,8 +56,8 @@ export struct ClipboardPanel {
   build() {
     Column() {
       Row() {
-        Text('クリップボード').fontSize(18).fontColor('#202338').layoutWeight(1)
-        Button('履歴を消す').fontSize(13).fontColor('#304B91').backgroundColor(Color.Transparent)
+        Text('クリップボード').fontSize(18).fontColor(KeyboardPalette.ink).layoutWeight(1)
+        Button('履歴を消す').fontSize(13).fontColor(KeyboardPalette.ink).backgroundColor(Color.Transparent)
           .id('clipboard-clear').enabled(this.entries.length > 0)
           .onClick(() => { clipboardHistory.clear(); this.entries = []; })
       }.height(this.metrics.toolbarHeight).width('100%')
@@ -73,12 +74,12 @@ export struct ClipboardPanel {
           ForEach(this.entries, (item: ClipboardItem) => {
             ListItem() {
               Row() {
-                Text(item.text).fontSize(16).fontColor('#202338').maxLines(3).textOverflow({ overflow: TextOverflow.Ellipsis })
+                Text(item.text).fontSize(16).fontColor(KeyboardPalette.ink).maxLines(3).textOverflow({ overflow: TextOverflow.Ellipsis })
                   .layoutWeight(1).padding(14).id('clipboard-item-' + item.id.toString()).onClick(() => { this.paste(item); })
                 Button('×').fontSize(22).fontColor('#64748B').width(36).height(40).padding(0).backgroundColor(Color.Transparent)
                   .id('clipboard-remove-' + item.id.toString()).accessibilityText('この履歴を削除')
                   .onClick(() => { clipboardHistory.remove(item.id); this.entries = clipboardHistory.snapshot(); })
-              }.width('100%').backgroundColor('#FFFFFF').borderRadius(10)
+              }.width('100%').backgroundColor(KeyboardPalette.key).borderRadius(10)
             }
           }, (item: ClipboardItem) => item.id.toString())
         }.layoutWeight(1).width('100%').scrollBar(BarState.Off).id('clipboard-list')
@@ -86,12 +87,12 @@ export struct ClipboardPanel {
       if (this.message.length > 0) { Text(this.message).fontSize(13).fontColor('#64748B').maxLines(2).width('100%') }
       Text('履歴は最大10件、1時間の一時保存です。').fontSize(11).fontColor('#64748B').width('100%').margin({ top: 4, bottom: 4 })
       Row({ space: this.metrics.gap }) {
-        Button(this.returnLabel).fontSize(17).fontColor('#304B91').layoutWeight(1)
-          .height(this.metrics.alphaHeight).backgroundColor('#CECAFA').borderRadius(24).id('clipboard-return')
+        Button(this.returnLabel).fontSize(17).fontColor(KeyboardPalette.ink).layoutWeight(1)
+          .height(this.metrics.alphaHeight).backgroundColor(KeyboardPalette.functionKey).borderRadius(24).id('clipboard-return')
           .onClick(() => { keyboardHaptics.tap(); this.onReturn(); })
         if (this.allowed) {
           Column() {
-            PasteButton().fontSize(17).fontColor('#304B91').iconColor('#304B91').backgroundColor('#CECAFA')
+            PasteButton().fontSize(17).fontColor(KeyboardPalette.ink).iconColor(KeyboardPalette.ink).backgroundColor(KeyboardPalette.functionKey)
               .height(Math.max(40, this.metrics.alphaHeight)).width('100%')
               .id('clipboard-paste').onClick((_event: ClickEvent, result: PasteButtonOnClickResult) => { this.readAndPaste(result); })
           }.layoutWeight(1)

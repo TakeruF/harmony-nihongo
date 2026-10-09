@@ -2,7 +2,7 @@ export class SettingsValues {
   haptics: boolean = true;
   halfSpace: boolean = false;
   threeModes: boolean = true;
-  flickOnly: boolean = true;
+  flickOnly: boolean = false;
   keitaiOnly: boolean = false;
   set(key: string, value: boolean): void {
     if (key === 'imeHaptics') { this.haptics = value; }

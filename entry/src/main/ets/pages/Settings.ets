@@ -10,7 +10,7 @@ struct Settings {
   @StorageLink('imeHalfSpace') halfSpace: boolean = false;
   @StorageLink('imeHaptics') haptics: boolean = true;
   @StorageLink('imeThreeModes') threeModes: boolean = true;
-  @StorageLink('imeFlickOnly') flickOnly: boolean = true;
+  @StorageLink('imeFlickOnly') flickOnly: boolean = false;
   @StorageLink('imeKeitaiOnly') keitaiOnly: boolean = false;
   private kanaPreview: string[][] = [['↶','あ','か','さ','⌫'], ['◀','た','な','は','▶'],
     ['記','ま','や','ら','空'], ['あa1','゛゜小','わ','、','↵']];

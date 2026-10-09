@@ -1,6 +1,6 @@
 import { inputMethodEngine, InputMethodExtensionContext } from '@kit.IMEKit';
 import { display } from '@kit.ArkUI';
-import { BusinessError } from '@kit.BasicServicesKit';
+import { BusinessError, deviceInfo } from '@kit.BasicServicesKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import nativeProbe from 'libnihongo.so';
 import { keyboardSettings } from './KeyboardSettings';
@@ -63,8 +63,52 @@ class ImeController {
       const width = screen.width / screen.densityPixels;
       const height = screen.height / screen.densityPixels;
       const metrics = new KeyboardMetrics(width, height);
-      await panel.resize(screen.width, Math.round(metrics.panelHeight * screen.densityPixels));
+      let popupInset = deviceInfo.sdkApiVersion >= 21 ? metrics.popupInset : 0;
+      let panelLeft = 0;
+      let panelRight = 0;
+      let keyboardHeight = metrics.panelHeight;
+      if (popupInset > 0) {
+        try {
+          // Rotation rectangles must each fit their own screen orientation.
+          const systemInsets = await panel.getSystemPanelCurrentInsets(screen.id);
+          if (!this.active || lifecycle !== this.lifecycle || panel !== this.panel) { return; }
+          const systemBottom = Math.max(0, systemInsets.bottom);
+          panelLeft = Math.max(0, systemInsets.left);
+          panelRight = Math.max(0, systemInsets.right);
+          const portraitActive = screen.width <= screen.height;
+          const portraitWidth = Math.min(screen.width, screen.height);
+          const portraitHeight = Math.max(screen.width, screen.height);
+          const portrait = new KeyboardMetrics((portraitWidth - (portraitActive ? panelLeft + panelRight : 0)) / screen.densityPixels, portraitHeight / screen.densityPixels);
+          const landscape = new KeyboardMetrics((portraitHeight - (portraitActive ? 0 : panelLeft + panelRight)) / screen.densityPixels, portraitWidth / screen.densityPixels);
+          const current = portraitActive ? portrait : landscape;
+          keyboardHeight = current.panelHeight; popupInset = current.popupInset;
+          const portraitInset = Math.ceil(portrait.popupInset * screen.densityPixels);
+          const landscapeInset = Math.ceil(landscape.popupInset * screen.densityPixels);
+          const portraitKeys = Math.round(portrait.panelHeight * screen.densityPixels);
+          const landscapeKeys = Math.round(landscape.panelHeight * screen.densityPixels);
+          panel.adjustPanelRect(inputMethodEngine.PanelFlag.FLG_FIXED, {
+            portraitRect: { left: 0, top: 0, width: portraitWidth, height: portraitKeys + portraitInset + systemBottom },
+            landscapeRect: { left: 0, top: 0, width: portraitHeight, height: landscapeKeys + landscapeInset + systemBottom },
+            portraitAvoidY: portraitInset, landscapeAvoidY: landscapeInset,
+            portraitInputRegion: [{ left: portraitActive ? panelLeft : 0, top: portraitInset,
+              width: portraitWidth - (portraitActive ? panelLeft + panelRight : 0), height: portraitKeys }],
+            landscapeInputRegion: [{ left: portraitActive ? 0 : panelLeft, top: landscapeInset,
+              width: portraitHeight - (portraitActive ? 0 : panelLeft + panelRight), height: landscapeKeys }]
+          });
+        } catch (_) {
+          if (!this.active || lifecycle !== this.lifecycle || panel !== this.panel) { return; }
+          popupInset = 0; panelLeft = 0; panelRight = 0; keyboardHeight = metrics.panelHeight;
+          await panel.resize(screen.width, Math.round(metrics.panelHeight * screen.densityPixels));
+          hilog.info(0x0001, 'NihongoIME', 'POPUP_PANEL_FALLBACK');
+        }
+      } else {
+        await panel.resize(screen.width, Math.round(metrics.panelHeight * screen.densityPixels));
+      }
       if (!this.active || lifecycle !== this.lifecycle || panel !== this.panel) { return; }
+      AppStorage.setOrCreate('imeKeyboardHeight', keyboardHeight);
+      AppStorage.setOrCreate('imePanelLeft', panelLeft / screen.densityPixels);
+      AppStorage.setOrCreate('imePanelRight', panelRight / screen.densityPixels);
+      AppStorage.setOrCreate('imePopupInset', popupInset);
       AppStorage.setOrCreate('imeScreenWidth', width);
       AppStorage.setOrCreate('imeScreenHeight', height);
     });
@@ -80,6 +124,8 @@ class ImeController {
   private queue: Promise<void> = Promise.resolve();
   private onStart = (keyboard: inputMethodEngine.KeyboardController, client: inputMethodEngine.InputClient): void => {
     this.generation++;
+    AppStorage.setOrCreate('imeEditorSession', this.generation);
+    AppStorage.setOrCreate('imeEditorWindowId', -1);
     this.queue = Promise.resolve();
     this.clearSelection();
     keyboardSettings.refresh();
@@ -116,6 +162,8 @@ class ImeController {
   };
   private onStop = (): void => {
     this.generation++;
+    AppStorage.setOrCreate('imeEditorSession', this.generation);
+    AppStorage.setOrCreate('imeEditorWindowId', -1);
     this.queue = Promise.resolve();
     this.clearSelection();
     this.kana = new KanaSession();
@@ -191,6 +239,7 @@ class ImeController {
     }
   };
   private publishEditorAction(attr: inputMethodEngine.EditorAttribute): void {
+    AppStorage.setOrCreate('imeEditorWindowId', typeof attr.windowId === 'number' ? attr.windowId : -1);
     const pattern = attr.inputPattern;
     AppStorage.setOrCreate('imeForceNumber', typeof pattern === 'number' &&
       (pattern === inputMethodEngine.PATTERN_NUMBER || pattern === inputMethodEngine.PATTERN_PHONE ||
@@ -367,6 +416,7 @@ class ImeController {
       if (this.candidateTimer >= 0) { clearTimeout(this.candidateTimer); this.candidateTimer = -1; }
     } else { this.scheduleConversion(); }
     AppStorage.setOrCreate('imeReading', composition.reading);
+    AppStorage.setOrCreate('imeCanReverse', composition.canReverse && !this.kana.conversion);
     AppStorage.setOrCreate('imeCompositionDisplay', composition.reading.length > 0 ? composition.display() : '');
   }
   private scheduleConversion(): void {
@@ -463,8 +513,12 @@ class ImeController {
     if (!this.ownsEditor(client, state)) { return; }
     let cursor: number | undefined;
     try { cursor = await probePreviewCursor(() => client.getTextIndexAtCursor()); }
-    catch (_err) {
-      if (this.ownsEditor(client, state)) { state.supported = false; }
+    catch (err) {
+      // A cursor read may fail while the editor connects. It says nothing about
+      // preview support; the next input will probe again before its first write.
+      if (this.ownsEditor(client, state)) {
+        hilog.info(0x0001, 'NihongoIME', 'CURSOR_PROBE_FAILED code=%{public}d', (err as BusinessError).code ?? 0);
+      }
       return;
     }
     if (!this.ownsEditor(client, state) || cursor !== undefined) { return; }
@@ -676,6 +730,14 @@ class ImeController {
   }
   commitKana(): void {
     this.enqueue((client: inputMethodEngine.InputClient) => this.commitState(client, this.kana));
+  }
+  reverseKana(): void {
+    this.enqueue(async (client: inputMethodEngine.InputClient) => {
+      const state = this.kana;
+      if (state.conversion || !state.composition.canReverse) { return true; }
+      state.composition.reverseTap();
+      return this.previewKana(client, state);
+    });
   }
   cancelKana(): void {
     this.enqueue(async (client: inputMethodEngine.InputClient) => {

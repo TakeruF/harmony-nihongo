@@ -1,0 +1,112 @@
+[
+  {
+    "key": "@-_/1",
+    "directions": {
+      "center": "@",
+      "left": "-",
+      "up": "_",
+      "right": "/",
+      "down": "1"
+    }
+  },
+  {
+    "key": "ABC2",
+    "directions": {
+      "center": "a",
+      "left": "b",
+      "up": "c",
+      "right": "",
+      "down": "2"
+    }
+  },
+  {
+    "key": "DEF3",
+    "directions": {
+      "center": "d",
+      "left": "e",
+      "up": "f",
+      "right": "",
+      "down": "3"
+    }
+  },
+  {
+    "key": "GHI4",
+    "directions": {
+      "center": "g",
+      "left": "h",
+      "up": "i",
+      "right": "",
+      "down": "4"
+    }
+  },
+  {
+    "key": "JKL5",
+    "directions": {
+      "center": "j",
+      "left": "k",
+      "up": "l",
+      "right": "",
+      "down": "5"
+    }
+  },
+  {
+    "key": "MNO6",
+    "directions": {
+      "center": "m",
+      "left": "n",
+      "up": "o",
+      "right": "",
+      "down": "6"
+    }
+  },
+  {
+    "key": "PQRS7",
+    "directions": {
+      "center": "p",
+      "left": "q",
+      "up": "r",
+      "right": "s",
+      "down": "7"
+    }
+  },
+  {
+    "key": "TUV8",
+    "directions": {
+      "center": "t",
+      "left": "u",
+      "up": "v",
+      "right": "",
+      "down": "8"
+    }
+  },
+  {
+    "key": "WXYZ9",
+    "directions": {
+      "center": "w",
+      "left": "x",
+      "up": "y",
+      "right": "z",
+      "down": "9"
+    }
+  },
+  {
+    "key": "quotes0",
+    "directions": {
+      "center": "'",
+      "left": "\"",
+      "up": ":",
+      "right": ";",
+      "down": "0"
+    }
+  },
+  {
+    "key": "punct",
+    "directions": {
+      "center": ".",
+      "left": ",",
+      "up": "?",
+      "right": "!",
+      "down": ""
+    }
+  }
+]

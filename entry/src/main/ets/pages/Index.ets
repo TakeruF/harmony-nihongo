@@ -1,3 +1,4 @@
+import { previewFieldValue } from '../input/PreviewFieldValue';
 import { window } from '@kit.ArkUI';
 import { common } from '@kit.AbilityKit';
 @Entry
@@ -29,7 +30,9 @@ struct Index {
         .onSubmit(() => { this.searchCount++; })
       TextArea({ placeholder: '文字・削除・改行をテスト', text: this.text })
         .id('multiInput').height(180).enterKeyType(EnterKeyType.NEW_LINE)
-        .onChange((value: string) => { this.text = value; })
+        .onChange((value: string, preview?: PreviewText) => {
+          this.text = previewFieldValue(value, preview?.value ?? '', preview?.offset ?? 0);
+        })
       Text('検索アクション: ' + this.searchCount).id('searchCount').fontSize(12)
       Text('かなをフリックするとMozcの漢字候補が表示されます。候補をタップすると確定できます。')
         .fontSize(14).fontColor('#64748B')

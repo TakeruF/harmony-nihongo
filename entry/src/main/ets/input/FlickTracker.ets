@@ -52,7 +52,7 @@ export class FlickTracker {
     while (this.contacts.length > 0 && this.contacts[0].ready) {
       const contact = this.contacts.shift();
       if (contact && !contact.cancelled && contact.values[contact.selected] !== '') {
-        result.push(new FlickOutput(contact.values[contact.selected], contact.session, contact.selected === 0 ? contact.values : [], contact.pressedAt));
+        result.push(new FlickOutput(contact.values[contact.selected], contact.session, contact.selected === 0 ? contact.values.filter((value: string) => value.length > 0) : [], contact.pressedAt));
       }
     }
     return result;

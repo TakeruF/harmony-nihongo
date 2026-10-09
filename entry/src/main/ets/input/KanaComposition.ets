@@ -6,6 +6,14 @@ export class KanaComposition {
   private lastTapCursor: number = -1;
   private tapIndex: number = 0;
 
+  get canReverse(): boolean { return this.lastTap.length > 0 && this.cursor === this.lastTapCursor && this.cursor > 0; }
+  reverseTap(timestamp: number = Date.now()): void {
+    if (!this.canReverse) { return; }
+    const group = this.lastTap; const values = group.split('|');
+    const index = (this.tapIndex + values.length - 1) % values.length;
+    this.backspace(); this.insert(values[index]);
+    this.tapIndex = index; this.lastTap = group; this.lastTapTime = timestamp; this.lastTapCursor = this.cursor;
+  }
   insert(value: string): void {
     this.lastTap = '';
     this.reading = this.reading.slice(0, this.cursor) + value + this.reading.slice(this.cursor);
@@ -22,6 +30,13 @@ export class KanaComposition {
     this.lastTap = '';
     if (this.cursor === 0) { return; }
     const character = this.reading.charAt(this.cursor - 1);
+    if (kind === 'case') {
+      if (/^[a-zA-Z]$/.test(character)) {
+        const replacement = character === character.toLowerCase() ? character.toUpperCase() : character.toLowerCase();
+        this.reading = this.reading.slice(0, this.cursor - 1) + replacement + this.reading.slice(this.cursor);
+      }
+      return;
+    }
     let cycles: string[] = [];
     if (kind === 'variant') {
       cycles = ['あぁ','いぃ','うぅゔ','えぇ','おぉ','かが','きぎ','くぐ','けげ','こご','さざ','しじ','すず','せぜ','そぞ',
