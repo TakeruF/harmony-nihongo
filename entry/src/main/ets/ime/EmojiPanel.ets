@@ -4,6 +4,7 @@ import { emojiCategories, EmojiCategory, EmojiEntry, EmojiCatalogData, Searchabl
 import { KeyboardMetrics } from './KeyboardMetrics';
 import { imeController } from './ImeController';
 import { keyboardHaptics } from './KeyboardHaptics';
+import { PanelBackButton } from './PanelBackButton';
 
 @Component
 export struct EmojiPanel {
@@ -15,14 +16,19 @@ export struct EmojiPanel {
   @State variants: string[] = [];
   @State selectedEntry: EmojiEntry = new EmojiEntry();
   private active: boolean = false;
-  private categoryIcons: Resource[] = [$r('app.media.ic_emoji'), $r('app.media.ic_person'), $r('app.media.ic_nature'),
+  private categoryIcons: Resource[] = [$r('app.media.ic_emoji_inactive'), $r('app.media.ic_person'), $r('app.media.ic_nature'),
     $r('app.media.ic_food'), $r('app.media.ic_travel'), $r('app.media.ic_activity'), $r('app.media.ic_object'),
     $r('app.media.ic_symbol'), $r('app.media.ic_flag')];
+  private selectedCategoryIcons: Resource[] = [$r('app.media.ic_emoji'), $r('app.media.ic_person_selected'), $r('app.media.ic_nature_selected'),
+    $r('app.media.ic_food_selected'), $r('app.media.ic_travel_selected'), $r('app.media.ic_activity_selected'), $r('app.media.ic_object_selected'),
+    $r('app.media.ic_symbol_selected'), $r('app.media.ic_flag_selected')];
   private scroller: Scroller = new Scroller();
   @Prop returnLabel: string = 'あいう';
   onReturn: () => void = () => {};
   onSymbols: () => void = () => {};
   onSearch: (query: string) => void = () => {};
+  onInsert: (text: string) => void = (text: string) => { imeController.insert(text); };
+  onDelete: () => void = () => { imeController.backspace(); };
   aboutToAppear(): void {
     this.active = true; this.recent = emojiHistory.snapshot();
     this.catalog = emojiCategories.map((category: EmojiCategory) => {
@@ -45,38 +51,40 @@ export struct EmojiPanel {
     return this.category < 0 ? this.recent : (this.catalog[this.category]?.entries ?? []);
   }
   private choose(entry: EmojiEntry, value: string = entry.value): void {
-    keyboardHaptics.tap(); imeController.insert(value);
+    keyboardHaptics.tap(); this.onInsert(value);
     const recent = new EmojiEntry(); recent.value = value; recent.name = entry.name; recent.keywords = entry.keywords;
     emojiHistory.remember(recent); this.recent = emojiHistory.snapshot(); this.variants = [];
   }
   private chooseCategory(index: number): void { keyboardHaptics.tap(); this.category = index; this.variants = []; this.scroller.scrollEdge(Edge.Top); }
   build() {
     Column() {
-      Row({ space: 6 }) {
-        Button() { Image($r('app.media.ic_back')).width(24).height(24) }
-          .width(36).height(36).padding(0).backgroundColor(KeyboardPalette.key).borderRadius(18)
-          .accessibilityText('キーボードに戻る').id('emoji-back').onClick(() => { this.onReturn(); })
-        Text('絵文字').fontSize(18).fontColor(KeyboardPalette.ink)
+      Row({ space: 10 }) {
+        PanelBackButton({ metrics: this.metrics, identifier: 'emoji-back', buttonBackground: KeyboardPalette.panelButton,
+          onBack: () => { this.onReturn(); } })
         Button() {
           Row({ space: 4 }) {
-            Image($r('app.media.ic_search')).width(19).height(19)
-            Text(this.query || '検索').fontSize(15).fontColor(KeyboardPalette.inactiveInk).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
+            Image($r('app.media.ic_search')).width(16).height(16)
+            Text(this.query || '検索').fontSize(13).fontColor(KeyboardPalette.inactiveInk).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
           }.padding({ left: 10, right: 10 })
-        }.height(34).width(112).padding(0).backgroundColor(KeyboardPalette.key).borderRadius(18)
+        }.height(this.metrics.toolbarHeight * 0.7).width(112).padding(0).backgroundColor(KeyboardPalette.panelButton).borderRadius(18)
           .id('emoji-search').accessibilityText('絵文字を検索').onClick(() => { this.onSearch(this.query); })
         Scroll() {
           Row({ space: 3 }) {
-            Button() { Image($r('app.media.ic_recent')).width(22).height(22) }.width(32).height(32).padding(0)
-              .backgroundColor(this.category < 0 ? KeyboardPalette.functionKey : Color.Transparent).borderRadius(16)
+            Button() {
+              Image(this.category < 0 ? $r('app.media.ic_recent_selected') : $r('app.media.ic_recent')).width(22).height(22)
+            }.width(32).height(32).padding(0)
+              .backgroundColor(this.category < 0 ? KeyboardPalette.panelAccent : Color.Transparent).borderRadius(16)
               .id('emoji-recent').accessibilityText('最近使った絵文字').onClick(() => { this.chooseCategory(-1); })
             ForEach(this.catalog, (item: SearchableEmojiCategory, index: number) => {
-              Button() { Image(this.categoryIcons[index]).width(22).height(22) }.width(32).height(32).padding(0).borderRadius(16)
-                .backgroundColor(index === this.category ? KeyboardPalette.functionKey : Color.Transparent)
+              Button() {
+                Image(index === this.category ? this.selectedCategoryIcons[index] : this.categoryIcons[index]).width(22).height(22)
+              }.width(32).height(32).padding(0).borderRadius(16)
+                .backgroundColor(index === this.category ? KeyboardPalette.panelAccent : Color.Transparent)
                 .accessibilityText(item.label).id('emoji-category-' + index.toString()).onClick(() => { this.chooseCategory(index); })
             }, (item: SearchableEmojiCategory) => item.label)
           }
         }.layoutWeight(1).scrollable(ScrollDirection.Horizontal).scrollBar(BarState.Off)
-      }.height(this.metrics.toolbarHeight).width('100%')
+      }.height(this.metrics.toolbarHeight * 0.93).width('100%').padding({ left: 2, right: 2 })
       Column() {
         Text(this.query ? '検索結果' : (this.category < 0 ? '最近使った絵文字' : (this.catalog[this.category]?.label ?? '絵文字')))
           .fontSize(12).fontColor(KeyboardPalette.inactiveInk).height(24).width('100%').padding({ left: 6 }).textAlign(TextAlign.Start)
@@ -90,7 +98,8 @@ export struct EmojiPanel {
               }, (value: string) => value)
             }.columnsTemplate('1fr 1fr 1fr 1fr 1fr 1fr').layoutWeight(1)
               .height(Math.min(132, Math.ceil(this.variants.length / 6) * 44)).scrollBar(BarState.Off)
-            Button('×').width(28).height(40).padding(0).backgroundColor(Color.Transparent).fontColor(KeyboardPalette.ink)
+            Button() { Image($r('app.media.ic_close')).width(20).height(20).fillColor(KeyboardPalette.ink) }
+              .width(28).height(40).padding(0).backgroundColor(Color.Transparent)
               .accessibilityText('肌の色の選択を閉じる').onClick(() => { this.variants = []; })
           }.width('100%').backgroundColor(KeyboardPalette.functionKey)
         }
@@ -101,9 +110,10 @@ export struct EmojiPanel {
           Grid(this.scroller) {
             ForEach(this.entries(), (entry: EmojiEntry) => {
               GridItem() {
-                Text(entry.value).fontSize(27).width('100%').height('100%').textAlign(TextAlign.Center)
+                Text(entry.value).fontSize(Math.min(this.metrics.numberWidth * 0.5, this.metrics.numberHeight * 0.72))
+                  .width('100%').height('100%').textAlign(TextAlign.Center)
                   .id('emoji-' + entry.value).accessibilityText(entry.name)
-              }.height(Math.max(32, this.metrics.numberHeight * 0.82)).onClick(() => { this.choose(entry); })
+              }.height(Math.max(24, this.metrics.numberHeight)).onClick(() => { this.choose(entry); })
                 .gesture(LongPressGesture().onAction(() => {
                   if (entry.variants.length > 0) { this.selectedEntry = entry; this.variants = [entry.value, ...entry.variants]; }
                 }))
@@ -111,19 +121,20 @@ export struct EmojiPanel {
           }.columnsTemplate('1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr').rowsGap(0).columnsGap(0)
             .layoutWeight(1).width('100%').scrollBar(BarState.Off).id('emoji-grid')
         }
-      }.width('100%').layoutWeight(1).backgroundColor(KeyboardPalette.key)
+      }.width('100%').layoutWeight(1).backgroundColor(KeyboardPalette.emojiPanel)
       Row() {
-        Button(this.returnLabel).fontSize(17).fontColor(KeyboardPalette.ink).width(54).height(44).padding(0)
+        Button(this.returnLabel).fontSize(17).fontColor(KeyboardPalette.ink).width(66).height(this.metrics.toolbarHeight * 0.84).padding(0)
           .backgroundColor(Color.Transparent).id('emoji-return').onClick(() => { keyboardHaptics.tap(); this.onReturn(); })
-        Button('#+=').fontSize(17).fontColor(KeyboardPalette.ink).width(44).height(44).padding(0)
-          .backgroundColor(Color.Transparent).id('emoji-symbols').onClick(() => { keyboardHaptics.tap(); this.onSymbols(); })
         Button() { Image($r('app.media.ic_emoji')).width(26).height(26) }
-          .width(36).height(36).padding(0).backgroundColor(KeyboardPalette.actionKey).borderRadius(18).accessibilityText('絵文字')
+          .width(50).height(this.metrics.toolbarHeight * 0.8).padding(0).backgroundColor(KeyboardPalette.panelAccent)
+          .borderRadius(22).margin({ left: 8 }).accessibilityText('絵文字')
+        Button('#+=').fontSize(17).fontColor(KeyboardPalette.ink).width(50).height(this.metrics.toolbarHeight * 0.8).padding(0)
+          .backgroundColor(KeyboardPalette.panelButton).borderRadius(20).id('emoji-symbols').onClick(() => { keyboardHaptics.tap(); this.onSymbols(); })
         Blank()
         Button() { Image($r('app.media.ic_backspace')).width(26).height(26) }
-          .width(44).height(44).padding(0).backgroundColor(Color.Transparent).id('emoji-delete').accessibilityText('削除')
-          .onClick(() => { keyboardHaptics.tap(); imeController.backspace(); })
+          .width(44).height(this.metrics.toolbarHeight * 0.84).padding(0).backgroundColor(Color.Transparent).id('emoji-delete').accessibilityText('削除')
+          .onClick(() => { keyboardHaptics.tap(); this.onDelete(); })
       }.width('100%').height(this.metrics.toolbarHeight)
-    }.width('100%').height('100%')
+    }.width('100%').height('100%').backgroundColor(KeyboardPalette.emojiPanel)
   }
 }

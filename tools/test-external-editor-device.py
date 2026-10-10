@@ -22,6 +22,8 @@ parser.add_argument('--rapid', action='store_true')
 parser.add_argument('--live-preview', action='store_true')
 parser.add_argument('--numeric-only', action='store_true')
 parser.add_argument('--no-screenshots', action='store_true')
+parser.add_argument('--after-ime-switch', action='store_true',
+                    help='Require retained focus after switching to this IME; never tap the editor to restore it')
 args = parser.parse_args()
 spec = importlib.util.spec_from_file_location('device', Path(__file__).with_name('test-kana-device.py'))
 d = importlib.util.module_from_spec(spec)
@@ -82,8 +84,12 @@ def capture(name):
 
 field = editor()
 assert field.get('text', '') == '', 'Refuse to alter a nonempty existing draft'
-d.tap(*center(field))
-time.sleep(.3)
+if args.after_ime_switch:
+    assert field.get('focused') == 'true', 'IME switch lost editor focus; refuse to restore it by tapping'
+    results.append({'test': 'IME switch retains editor focus without retapping', 'status': 'PASS'})
+else:
+    d.tap(*center(field))
+    time.sleep(.3)
 if args.numeric_only:
     assert any(n.get('id') == 'key-1' for n in nodes()), 'Numeric field must open numeric layout'
     for digit in '123': key(digit)

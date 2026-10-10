@@ -56,6 +56,8 @@ static napi_value Init(napi_env env, napi_value exports) {
         {"segments", nullptr, SegmentMozc, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"learnSegments", nullptr, LearnSegmentsMozc, nullptr, nullptr, nullptr, napi_default, nullptr},
         {"convert", nullptr, ConvertMozc, nullptr, nullptr, nullptr, napi_default, nullptr},
+        {"predictNext", nullptr, NextMozc, nullptr, nullptr, nullptr, napi_default, nullptr},
+        {"clearLearning", nullptr, ClearLearningMozc, nullptr, nullptr, nullptr, napi_default, nullptr},
 #endif
     };
     if (napi_define_properties(env, exports, sizeof(methods) / sizeof(methods[0]), methods) != napi_ok) { return nullptr; }

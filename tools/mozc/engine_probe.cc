@@ -12,8 +12,33 @@ extern "C" const char* nihongo_engine_segment_value(int, int);
 extern "C" int nihongo_engine_learn_segments(const char*, const char* const*, const char* const*, int);
 extern "C" int nihongo_engine_resize(const char*, const int*, int, int, int, int);
 extern "C" const char* nihongo_engine_reverse(const char*);
+extern "C" int nihongo_engine_next(const char*, int);
+extern "C" int nihongo_engine_clear_learning();
 int main(int argc, char** argv) {
   if (argc != 5 || !nihongo_engine_init(argv[1], argv[2])) return 2;
+  if (std::strcmp(argv[4], "--next") == 0) {
+    const int count = nihongo_engine_next(argv[3], 1);
+    std::printf("NEXT_COUNT=%d\n", count);
+    if (count == 0) return 40;
+    bool found = false;
+    for (int i = 0; i < count; ++i) {
+      const char* key = nihongo_engine_segment_value(i, 0);
+      const char* value = nihongo_engine_segment_value(i, 1);
+      std::printf("NEXT=%s\t%s\n", key, value);
+      if (!*key || !*value || std::strcmp(value, argv[3]) == 0) return 41;
+      if (std::strcmp(value, "ございます") == 0) found = true;
+    }
+    if (std::strcmp(argv[3], "おはよう") == 0 && !found) return 42;
+    if (nihongo_engine_next("", 0) != 0) return 43;
+    return 0;
+  }
+  if (std::strcmp(argv[4], "--clear") == 0) {
+    if (!nihongo_engine_clear_learning()) return 44;
+    nihongo_engine_convert("はし", 0);
+    if (std::strcmp(nihongo_engine_candidate(0), "箸") == 0) return 45;
+    if (nihongo_engine_learn("きょうは", "今日は")) return 46;
+    std::puts("CLEAR_LEARNING=PASS"); return 0;
+  }
   if (std::strcmp(argv[4], "--reverse") == 0) {
     const std::string reading = nihongo_engine_reverse(argv[3]);
     std::printf("REVERSE=%s\n",reading.c_str());

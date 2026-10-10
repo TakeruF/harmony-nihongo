@@ -1,5 +1,10 @@
 import { KanaComposition } from '../input/KanaComposition';
+import { RomajiInput } from '../input/RomajiInput';
+import { ClipboardComposition } from '../input/ClipboardComposition';
 import { ClipboardPanel } from './ClipboardPanel';
+import { clipboardHistory } from '../input/ClipboardHistory';
+import { PanelBackButton } from './PanelBackButton';
+import { PredictionPanel } from './PredictionPanel';
 import { EmojiPanel } from './EmojiPanel';
 import { CursorHoldTracker } from '../input/CursorHoldTracker';
 import { KeyRepeatTracker } from '../input/KeyRepeatTracker';
@@ -10,57 +15,119 @@ import { FlickTracker, FlickOutput } from '../input/FlickTracker';
 import { KeyboardMetrics } from './KeyboardMetrics';
 import { KeyboardPalette } from './KeyboardPalette';
 import { TwelveKeyGroup, TwelveKeyLayout } from '../input/TwelveKeyLayout';
-import { InputMethodListDialog } from '@kit.IMEKit';
 import { CandidateChoice, CandidateRow, candidateRows } from '../input/CandidateLayout';
 
 @Entry
 @Component
 struct Keyboard {
-  private inputMethodsDialog: CustomDialogController = new CustomDialogController({ builder: InputMethodListDialog(), autoCancel: true });
   @State mode: string = 'kana';
+  private predictionReturnMode: string = 'kana';
+  @State candidateToRemove: string = '';
+  private removeContext: number = -1;
+  private removeSession: number = -1;
+  private openPredictionSettings(): void {
+    this.flushFlicks(); this.clearHolds(); this.candidatesExpanded = false;
+    this.candidateToRemove = ''; this.predictionReturnMode = this.mode; this.mode = 'prediction';
+  }
+  private requestCandidateRemoval(value: string, context: number): void {
+    if (this.localInput() || this.segmentMode || value === this.reading) { return; }
+    this.candidateToRemove = value; this.removeContext = context; this.removeSession = imeController.sessionId;
+  }
   @State emojiSearching: boolean = false;
   @State emojiQuery: string = '';
+  @State clipboardAdding: boolean = false;
+  @State clipboardDraft: string = '';
+  @State clipboardDraftError: string = '';
   private emojiComposition: KanaComposition = new KanaComposition();
+  private clipboardComposition: ClipboardComposition = new ClipboardComposition();
+  private clipboardRomaji: RomajiInput = new RomajiInput();
+  private removeClipboardPending(): void {
+    for (let index = 0; index < this.clipboardRomaji.pending.length; index++) { this.clipboardComposition.backspace(); }
+  }
+  private finishClipboardRomaji(): void {
+    if (!this.clipboardAdding || this.emojiSearching) { return; }
+    this.removeClipboardPending(); this.clipboardComposition.insert(this.clipboardRomaji.finish()); this.publishLocalReading();
+  }
+  private localComposition(): KanaComposition { return this.emojiSearching ? this.emojiComposition : this.clipboardComposition; }
+  private localInput(): boolean { return this.emojiSearching || this.clipboardAdding; }
+  private publishLocalReading(): void {
+    if (this.emojiSearching) { this.emojiQuery = this.emojiComposition.reading; }
+    else { this.clipboardDraft = this.clipboardComposition.reading; this.clipboardDraftError = ''; }
+  }
   @StorageLink('imeEditorWindowId') editorWindowId: number = -1;
   @StorageLink('imeEditorSession') @Watch('searchEditorChanged') editorSession: number = 0;
   private searchEditorChanged(): void {
-    if (this.emojiSearching) {
-      this.flicks.cancelAll(); this.emojiSearching = false; this.emojiQuery = ''; this.emojiComposition.clear();
-      this.mode = this.emojiReturnMode;
+    this.candidateToRemove = '';
+    if (this.mode === 'prediction') { this.mode = this.predictionReturnMode; }
+    if (this.localInput()) {
+      const nextMode = this.clipboardAdding ? this.clipboardReturnMode : this.emojiReturnMode;
+      this.flicks.cancelAll(); this.emojiSearching = false; this.clipboardAdding = false;
+      this.clipboardDraft = ''; this.emojiQuery = ''; this.emojiComposition.clear(); this.clipboardComposition.clear();
+      this.clipboardRomaji.reset(); this.upper = false; this.capsLocked = false; this.mode = nextMode;
     }
   }
   @StorageLink('imeCanReverse') canReverse: boolean = false;
-  private shownReading(): string { return this.emojiSearching ? this.emojiQuery : this.reading; }
+  private shownReading(): string { return this.emojiSearching ? this.emojiQuery : (this.clipboardAdding ? this.clipboardDraft : this.reading); }
+  private beginClipboardAdd(): void {
+    this.clipboardComposition.clear(); this.clipboardRomaji.reset(); this.clipboardDraft = ''; this.clipboardDraftError = ''; this.clipboardAdding = true;
+    this.candidatesExpanded = false; this.mode = this.japaneseMode;
+  }
+  private finishClipboardAdd(save: boolean): void {
+    if (save) {
+      this.flushFlicks();
+      this.finishClipboardRomaji();
+      if (!clipboardHistory.remember(this.clipboardDraft)) {
+        this.clipboardDraftError = this.clipboardDraft.length === 0 ? 'クリップを入力してください。' :
+          (this.clipboardDraft.length > 16384 ? 'クリップが長すぎます。' : '固定したクリップの固定を解除してください。');
+        return;
+      }
+    } else { this.flicks.cancelAll(); }
+    this.clipboardAdding = false; this.clipboardDraft = ''; this.clipboardComposition.clear(); this.clipboardRomaji.reset();
+    this.clearHolds(); this.activeKey = ''; this.selectedKana = ''; this.mode = 'clipboard';
+  }
   private beginEmojiSearch(query: string): void {
+    this.finishClipboardRomaji();
     this.emojiComposition.clear(); this.emojiComposition.insert(query); this.emojiQuery = query;
     this.emojiSearching = true; this.candidatesExpanded = false; this.mode = this.japaneseMode;
   }
   private finishEmojiSearch(): void { this.flushFlicks(); this.emojiSearching = false; this.mode = 'emoji'; }
   private insertText(text: string): void {
-    if (this.emojiSearching) { this.emojiComposition.insert(text); this.emojiQuery = this.emojiComposition.reading; }
+    this.finishClipboardRomaji();
+    if (this.localInput()) { this.localComposition().insert(text); this.publishLocalReading(); }
     else { imeController.insert(text); }
   }
   private deleteText(): void {
-    if (this.emojiSearching) { this.emojiComposition.backspace(); this.emojiQuery = this.emojiComposition.reading; }
+    if (this.clipboardAdding && !this.emojiSearching && this.clipboardRomaji.pending.length > 0) {
+      this.removeClipboardPending(); this.clipboardRomaji.erase();
+      this.clipboardComposition.insert(this.clipboardRomaji.pending); this.publishLocalReading(); return;
+    }
+    if (this.clipboardAdding && !this.emojiSearching) { this.clipboardRomaji.reset(); }
+    if (this.localInput()) { this.localComposition().backspace(); this.publishLocalReading(); }
     else { imeController.backspace(); }
   }
   private transformText(kind: string): void {
-    if (this.emojiSearching) { this.emojiComposition.transform(kind); this.emojiQuery = this.emojiComposition.reading; }
+    this.finishClipboardRomaji();
+    if (this.localInput()) { this.localComposition().transform(kind); this.publishLocalReading(); }
     else { imeController.transformKana(kind); }
   }
   private moveText(delta: number): void {
-    if (this.emojiSearching) { this.emojiComposition.move(delta); }
+    this.finishClipboardRomaji();
+    if (this.localInput()) { this.localComposition().move(delta); }
     else if (delta < 0) { imeController.moveLeft(); } else { imeController.moveRight(); }
   }
   private reverseText(): void {
-    if (this.emojiSearching) { this.emojiComposition.reverseTap(); this.emojiQuery = this.emojiComposition.reading; }
+    this.finishClipboardRomaji();
+    if (this.localInput()) { this.localComposition().reverseTap(); this.publishLocalReading(); }
     else { imeController.reverseKana(); }
   }
-  private enterText(): void { if (this.emojiSearching) { this.finishEmojiSearch(); } else { imeController.enter(); } }
-  private spaceText(): void { if (this.emojiSearching) { this.insertText(' '); } else { imeController.kanaSpace(); } }
-  private convertText(): void { if (this.emojiSearching) { this.finishEmojiSearch(); } else { imeController.startSegmentConversion(); } }
+  private enterText(): void { if (this.emojiSearching) { this.finishEmojiSearch(); } else if (this.clipboardAdding) { this.finishClipboardAdd(true); } else { imeController.enter(); } }
+  private spaceText(): void { if (this.localInput()) { this.insertText(' '); } else { imeController.kanaSpace(); } }
+  private convertText(): void { if (this.localInput()) { this.enterText(); } else { imeController.startSegmentConversion(); } }
   private romajiText(text: string): void {
-    if (this.emojiSearching) { this.insertText(text); } else { imeController.romajiInput(text, imeController.sessionId); }
+    if (this.clipboardAdding && !this.emojiSearching) {
+      this.removeClipboardPending(); const value = this.clipboardRomaji.feed(text);
+      this.clipboardComposition.insert(value + this.clipboardRomaji.pending); this.publishLocalReading();
+    } else if (this.localInput()) { this.insertText(text); } else { imeController.romajiInput(text, imeController.sessionId); }
   }
 
   @State japaneseMode: string = 'kana';
@@ -85,6 +152,8 @@ struct Keyboard {
   @State activeKey: string = '';
   @State selectedKana: string = '';
   @StorageLink('imeCandidates') @Watch('candidatesChanged') candidates: string[] = [];
+  @StorageLink('imeNextCandidates') nextCandidates: boolean = false;
+  @StorageLink('imePrivate') privateMode: boolean = false;
   @StorageLink('imeSegmentValue') segmentValue: string = '';
   @State candidateChoices: CandidateChoice[] = [];
   @StorageLink('imeSegmentMode') segmentMode: boolean = false;
@@ -95,6 +164,8 @@ struct Keyboard {
   private cursorHolds: CursorHoldTracker = new CursorHoldTracker();
   private flicks: FlickTracker = new FlickTracker();
   @State upper: boolean = false;
+  @State capsLocked: boolean = false;
+  @State alphabetQwerty: boolean = false;
   @StorageLink('imeError') error: string = '';
   private screen = display.getDefaultDisplaySync();
   @StorageLink('imeScreenWidth') @Watch('layoutChanged') screenWidth: number = this.screen.width / this.screen.densityPixels;
@@ -141,11 +212,12 @@ struct Keyboard {
     }
   }
   private readingChanged(): void {
+    this.candidateToRemove = '';
     if (this.shownReading().length === 0) { this.candidatesExpanded = false; }
   }
 
   private keyWidth(weight: number): number {
-    const unit = (this.mode === 'romaji') ? this.metrics.alphaWidth : this.metrics.numberWidth;
+    const unit = (this.mode === 'romaji' || (this.metrics.tablet && this.mode === 'alpha' && this.alphabetQwerty)) ? this.metrics.alphaWidth : this.metrics.numberWidth;
     return unit * weight + this.metrics.gap * (weight - 1);
   }
 
@@ -163,20 +235,20 @@ struct Keyboard {
   }
 
   private verticalGap(): number {
-    return (this.mode === 'romaji') ? this.metrics.alphaGap : this.metrics.numberGap;
+    return (this.mode === 'romaji' || (this.metrics.tablet && this.mode === 'alpha' && this.alphabetQwerty)) ? this.metrics.alphaGap : this.metrics.numberGap;
   }
 
   private keyHeight(): number {
-    return (this.mode === 'romaji') ? this.metrics.alphaHeight : this.metrics.numberHeight;
+    return (this.mode === 'romaji' || (this.metrics.tablet && this.mode === 'alpha' && this.alphabetQwerty)) ? this.metrics.alphaHeight : this.metrics.numberHeight;
   }
 
   private acceptFlicks(outputs: FlickOutput[]): void {
     outputs.forEach((output: FlickOutput) => {
-      if (this.emojiSearching) {
+      if (this.localInput()) {
         const taps = this.mode === 'alpha' ? TwelveKeyLayout.alphabetTapValues(output.tapValues) : output.tapValues;
-        if (taps.length > 0 && !(AppStorage.get<boolean>('imeFlickOnly') ?? false)) { this.emojiComposition.tap(taps, output.pressedAt); }
-        else { this.emojiComposition.insert(output.value); }
-        this.emojiQuery = this.emojiComposition.reading; return;
+        if (taps.length > 0 && !(AppStorage.get<boolean>('imeFlickOnly') ?? false)) { this.localComposition().tap(taps, output.pressedAt); }
+        else { this.localComposition().insert(output.value); }
+        this.publishLocalReading(); return;
       }
       if (this.mode === 'number') { this.insertText(output.value); }
       else {
@@ -187,7 +259,7 @@ struct Keyboard {
   }
   private flushFlicks(): void { this.acceptFlicks(this.flicks.flush()); this.activeKey = ''; this.selectedKana = ''; }
   private changeMode(mode: string): void {
-    this.flushFlicks(); this.clearHolds(); if (!this.emojiSearching) { imeController.commitKana(); } this.mode = mode;
+    this.flushFlicks(); this.finishClipboardRomaji(); this.clearHolds(); if (!this.localInput()) { imeController.commitKana(); } this.mode = mode;
   }
   private modeTouch(event: TouchEvent): void {
     event.changedTouches.forEach((touch: TouchObject) => {
@@ -205,8 +277,10 @@ struct Keyboard {
     });
   }
   private letter(key: string): void {
-    if (this.mode === 'romaji') { this.romajiText(key); }
-    else { this.insertText(this.upper ? key.toUpperCase() : key); }
+    const value = this.upper || this.capsLocked ? key.toUpperCase() : key;
+    if (this.mode === 'romaji') { this.romajiText(value); }
+    else { this.insertText(value); }
+    if (this.metrics.tablet && !this.capsLocked) { this.upper = false; }
   }
   @Builder
   modeKey(weight: number = 1) {
@@ -261,7 +335,7 @@ struct Keyboard {
   keyboardKey(label: string, action: () => void, weight: number = 1,
     accent: boolean = false, pill: boolean = false, large: boolean = false, actionKey: boolean = false) {
     Button() {
-      Text(label).fontSize(large ? 24 : (this.mode === 'romaji' && label.length > 1 ? 14 : 20)).fontColor(KeyboardPalette.ink)
+      Text(label).fontSize(large ? 24 : ((this.mode === 'romaji' && label.length > 1) || (this.metrics.tablet && label === '?123') ? 14 : 20)).fontColor(KeyboardPalette.ink)
         .textAlign(TextAlign.Center).width('100%').maxLines(1)
     }.type(ButtonType.Normal).borderRadius(pill ? this.keyHeight() / 2 : 8).padding(0)
       .backgroundColor(actionKey ? KeyboardPalette.actionKey : (accent ? KeyboardPalette.functionKey : KeyboardPalette.key))
@@ -276,9 +350,10 @@ struct Keyboard {
   @Builder
   iconKey(icon: Resource, accessibleLabel: string, action: () => void, weight: number = 1, pill: boolean = false, repeat: boolean = false, actionKey: boolean = false) {
     Button() {
-      Image(icon).width(25).height(25).opacity(accessibleLabel === '逆順' && !(this.emojiSearching ? this.emojiComposition.canReverse : this.canReverse) ? 0.4 : 1)
+      Image(icon).width(25).height(25).opacity(accessibleLabel === '逆順' && !(this.localInput() ? this.localComposition().canReverse : this.canReverse) ? 0.4 : 1)
     }.type(ButtonType.Normal).borderRadius(pill ? this.keyHeight() / 2 : 8).padding(0)
-      .backgroundColor(actionKey ? KeyboardPalette.actionKey : KeyboardPalette.functionKey).height(this.keyHeight()).width(this.keyWidth(weight))
+      .backgroundColor((accessibleLabel === 'Caps Lock' ? this.capsLocked :
+        (accessibleLabel === '左Shift' || accessibleLabel === '右Shift' ? this.upper : actionKey)) ? KeyboardPalette.actionKey : KeyboardPalette.functionKey).height(this.keyHeight()).width(this.keyWidth(weight))
       .id('key-' + accessibleLabel)
       .responseRegion({ x: -this.metrics.gap / 2, y: -this.verticalGap() / 2,
         width: this.keyWidth(weight) + this.metrics.gap, height: this.keyHeight() + this.verticalGap() })
@@ -413,7 +488,9 @@ struct Keyboard {
 
   @Builder
   enterKey(weight: number = 1) {
-    if (this.emojiSearching) {
+    if (this.clipboardAdding && !this.emojiSearching) {
+      this.iconKey($r('app.media.ic_check'), 'クリップ保存', () => { this.enterText(); }, weight, true, false, true)
+    } else if (this.emojiSearching) {
       this.iconKey($r('app.media.ic_search'), '絵文字検索', () => { this.enterText(); }, weight, true, false, true)
     } else if (this.shownReading().length > 0) {
       this.iconKey($r('app.media.ic_enter'), '確定', () => { this.enterText(); }, weight, true, false, true)
@@ -459,19 +536,51 @@ struct Keyboard {
   }
 
   @Builder
+  predictionSettingsButton() {
+    Button() { Image($r('app.media.ic_settings')).width(20).height(20) }
+      .padding(0).height(32).width(30).backgroundColor(Color.Transparent).id('open-prediction-settings')
+      .accessibilityText('予測・学習の設定').onClick(() => { keyboardHaptics.tap(); this.openPredictionSettings(); })
+  }
+
+  @Builder
   keyboardToolbar() {
-    if (this.emojiSearching) {
+    if (this.candidateToRemove.length > 0) {
+      Row({ space: 4 }) {
+        Text('「' + this.candidateToRemove + '」を削除').fontSize(14).fontColor(KeyboardPalette.ink).layoutWeight(1).maxLines(1)
+        Button('削除').id('candidate-remove-confirm').fontSize(13).backgroundColor(KeyboardPalette.functionKey).fontColor(KeyboardPalette.ink)
+          .onClick(() => {
+            imeController.forgetCandidate(this.candidateToRemove, this.removeSession, this.removeContext);
+            this.candidateToRemove = ''; this.candidatesExpanded = false;
+          })
+        Button() { Image($r('app.media.ic_close')).width(20).height(20) }.id('candidate-remove-cancel').width(32).height(32).padding(0).backgroundColor(Color.Transparent).fontColor(KeyboardPalette.ink)
+          .onClick(() => { this.candidateToRemove = ''; })
+      }.width('100%').height(this.metrics.toolbarHeight)
+    } else if (this.clipboardAdding && !this.emojiSearching) {
       Row({ space: 8 }) {
-        Button() { Image($r('app.media.ic_left')).width(24).height(24) }
-          .width(36).height(36).padding(0).backgroundColor(Color.Transparent).id('emoji-search-back')
-          .accessibilityText('絵文字の一覧へ戻る').onClick(() => { this.finishEmojiSearch(); })
+        PanelBackButton({ metrics: this.metrics, identifier: 'clipboard-add-back', label: '追加をキャンセル', editing: true,
+          onBack: () => { this.finishClipboardAdd(false); } })
+        Text(this.clipboardDraftError || this.clipboardDraft || '新しいクリップ').fontSize(18)
+          .fontColor(this.clipboardDraftError ? '#B42318' : KeyboardPalette.ink).layoutWeight(1).maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis }).id('clipboard-draft')
+        Button() { Image($r('app.media.ic_check')).width(22).height(22) }
+          .width(36).height(36).padding(0).backgroundColor(KeyboardPalette.key).borderRadius(18)
+          .enabled(this.clipboardDraft.length > 0 && this.clipboardDraft.length <= 16384).id('clipboard-add-save')
+          .accessibilityText('クリップを保存').onClick(() => { this.finishClipboardAdd(true); })
+      }.width('100%').height(this.metrics.toolbarHeight)
+    } else if (this.emojiSearching) {
+      Row({ space: 8 }) {
+        PanelBackButton({ metrics: this.metrics, identifier: 'emoji-search-back', label: '絵文字の一覧へ戻る',
+          buttonBackground: KeyboardPalette.panelButton, onBack: () => { this.finishEmojiSearch(); } })
         Text(this.emojiQuery || '絵文字を検索').fontSize(18).fontColor(KeyboardPalette.ink).layoutWeight(1).maxLines(1)
           .textOverflow({ overflow: TextOverflow.Ellipsis }).id('emoji-search-query')
-        Button('×').width(32).height(32).padding(0).backgroundColor(Color.Transparent).fontColor(KeyboardPalette.ink)
+        Button() { Image($r('app.media.ic_close')).width(20).height(20) }.width(32).height(32).padding(0).backgroundColor(Color.Transparent).fontColor(KeyboardPalette.ink)
           .id('emoji-search-clear').accessibilityText('検索語を消す').onClick(() => { this.emojiComposition.clear(); this.emojiQuery = ''; })
       }.width('100%').height(this.metrics.toolbarHeight)
-    } else if (this.shownReading().length > 0) {
+    } else if (this.shownReading().length > 0 || (this.nextCandidates && (this.mode === 'kana' || this.mode === 'romaji'))) {
       Row({ space: 4 }) {
+        if (this.nextCandidates) {
+          this.predictionSettingsButton()
+        }
         Scroll() {
           Row() {
             ForEach(this.candidateChoices, (choice: CandidateChoice, index: number) => {
@@ -480,6 +589,8 @@ struct Keyboard {
                 .fontSize(17).fontColor(this.segmentMode && choice.value === this.segmentValue ? KeyboardPalette.selectedInk : KeyboardPalette.ink)
                 .fontWeight(this.segmentMode && choice.value === this.segmentValue ? FontWeight.Medium : FontWeight.Normal).maxLines(1)
                 .padding({ left: 12, right: 12 }).height(this.metrics.toolbarHeight)
+                .accessibilityText(choice.value + (this.privateMode || this.segmentMode || choice.value === this.reading ? '' : '。長押しで候補を削除'))
+                .gesture(LongPressGesture().onAction(() => { if (!this.privateMode) { this.requestCandidateRemoval(choice.value, choice.context); } }))
                 .onClick(() => {
                   keyboardHaptics.tap();
                   this.flushFlicks();
@@ -496,7 +607,7 @@ struct Keyboard {
           Image($r('app.media.ic_hide')).width(20).height(20).fillColor(KeyboardPalette.ink).rotate({ angle: this.candidatesExpanded ? 180 : 0 })
         }.padding(0).width(40).height(this.metrics.toolbarHeight).backgroundColor(Color.Transparent)
           .onClick(() => { keyboardHaptics.tap(); this.flushFlicks(); this.candidatesExpanded = !this.candidatesExpanded; })
-          .accessibilityText(this.candidatesExpanded ? '変換候補を閉じる' : '変換候補を展開')
+          .id('candidate-expand').accessibilityText(this.candidatesExpanded ? '変換候補を閉じる' : '変換候補を展開')
       }.width('100%').height(this.metrics.toolbarHeight)
     } else {
       Row({ space: 4 }) {
@@ -508,11 +619,19 @@ struct Keyboard {
           .padding(0).height(32).width(32).backgroundColor(Color.Transparent).accessibilityText('クリップボード').id('open-clipboard')
           .onClick(() => { keyboardHaptics.tap(); this.openClipboard(); })
         Blank()
-        if (this.canOpenSettings) {
-          Button() { Image($r('app.media.ic_settings')).width(20).height(20) }
-            .padding(0).height(32).width(28).backgroundColor(Color.Transparent).accessibilityText('アプリの設定')
-            .onClick(() => { keyboardHaptics.tap(); imeController.openAppSettings(); })
+        if (this.metrics.tablet && (this.mode === 'kana' || this.mode === 'romaji' || this.mode === 'alpha')) {
+          Button(this.mode === 'romaji' || (this.mode === 'alpha' && this.alphabetQwerty) ? '12キー' : 'QWERTY')
+            .id('tablet-layout-toggle').fontSize(14).fontColor(KeyboardPalette.ink)
+            .height(36).padding({ left: 14, right: 14 }).backgroundColor(KeyboardPalette.functionKey)
+            .accessibilityText('日本語12キー・QWERTY切替')
+            .onClick(() => {
+              this.flushFlicks(); this.clearHolds(); this.upper = false; this.capsLocked = false;
+              if (this.mode === 'alpha') { this.alphabetQwerty = !this.alphabetQwerty; }
+              else { this.japaneseMode = this.mode === 'romaji' ? 'kana' : 'romaji'; this.changeMode(this.japaneseMode); }
+            })
         }
+        this.predictionSettingsButton()
+        if (this.privateMode) { Text('シークレット').fontSize(10).fontColor(KeyboardPalette.inactiveInk) }
         Button() { Image($r('app.media.ic_hide')).width(22).height(22) }
           .backgroundColor(Color.Transparent).width(32).height(32).accessibilityText('キーボードを閉じる')
           .onClick(() => { keyboardHaptics.tap(); this.flushFlicks(); imeController.commitKana(); imeController.hide(); })
@@ -526,7 +645,7 @@ struct Keyboard {
       ForEach(this.kanaRows, (row: string[][], index: number) => {
         Row({ space: this.metrics.gap }) {
           if (index === 0) {
-            if (this.canReconvert && !this.emojiSearching) {
+            if (this.canReconvert && !this.localInput()) {
               this.keyboardKey('再変換', () => { imeController.reconvertSelection(); }, 1, true)
             } else { this.iconKey($r('app.media.ic_undo'), '逆順', () => { this.reverseText(); }) }
           } else if (index === 1) {
@@ -548,21 +667,12 @@ struct Keyboard {
       }, (row: string[][], index: number) => index.toString())
       Row({ space: this.metrics.gap }) {
         this.modeKey()
-        if (this.shownReading().length > 0) { this.modifierKey() } else { this.languageKey() }
+        this.modifierKey()
         this.kanaKey(['わ','を','ん','ー','〜'])
         this.kanaKey(['、','。','？','！','…'])
         this.enterKey()
       }.width('100%')
     }.width('100%')
-  }
-
-  @Builder
-  languageKey() {
-    Button() { Image($r('app.media.ic_globe')).width(24).height(24) }
-      .type(ButtonType.Normal).borderRadius(8).padding(0).backgroundColor(KeyboardPalette.key)
-      .height(this.metrics.numberHeight).width(this.metrics.numberWidth)
-      .id('key-入力言語').accessibilityText('入力言語を選択')
-      .onClick(() => { keyboardHaptics.tap(); this.flushFlicks(); imeController.commitKana(); this.inputMethodsDialog.open(); })
   }
 
   @Builder
@@ -581,9 +691,7 @@ struct Keyboard {
       }, (row: TwelveKeyGroup[], index: number) => index.toString())
       Row({ space: this.metrics.gap }) {
         this.modeKey()
-        if (this.shownReading().length > 0) {
-          this.keyboardKey('a ⇔ A', () => { this.transformText('case'); })
-        } else { this.languageKey() }
+        this.keyboardKey('a ⇔ A', () => { this.transformText('case'); })
         this.kanaKey(TwelveKeyLayout.quotes.values, TwelveKeyLayout.quotes.label, TwelveKeyLayout.quotes.hint)
         this.kanaKey(TwelveKeyLayout.alphabetPunctuation.values, TwelveKeyLayout.alphabetPunctuation.label)
         this.enterKey()
@@ -629,6 +737,64 @@ struct Keyboard {
         this.cursorKey(-1)
         this.cursorKey(1)
         this.enterKey(1.5)
+      }.width('100%')
+    }.width('100%')
+  }
+
+  // Read case state in the builder body so ArkUI refreshes both the label and
+  // accessibility ID; passing a computed primitive through ForEach freezes it.
+  @Builder
+  tabletLetterKey(key: string) {
+    Button() {
+      Text(this.upper || this.capsLocked ? key.toUpperCase() : key)
+        .fontSize(20).fontColor(KeyboardPalette.ink).width('100%').textAlign(TextAlign.Center)
+    }.type(ButtonType.Normal).borderRadius(8).padding(0).backgroundColor(KeyboardPalette.key)
+      .height(this.metrics.alphaHeight).width(this.metrics.alphaWidth)
+      .id('key-' + (this.upper || this.capsLocked ? key.toUpperCase() : key))
+      .responseRegion({ x: -this.metrics.gap / 2, y: -this.metrics.alphaGap / 2,
+        width: this.metrics.alphaWidth + this.metrics.gap, height: this.metrics.alphaHeight + this.metrics.alphaGap })
+      .onTouch((event: TouchEvent) => { this.press(event, () => { this.letter(key); }); })
+      .onClick((event: ClickEvent) => { this.accessibleClick(event, () => { this.letter(key); }); })
+  }
+
+  @Builder
+  tabletAlphaKeys() {
+    Column({ space: this.metrics.alphaGap }) {
+      Row({ space: this.metrics.gap }) {
+        this.iconKey($r('app.media.ic_tab'), 'Tab', () => { if (this.mode === 'romaji') { this.romajiText('\t'); } else { this.insertText('\t'); } }, 1.2)
+        ForEach(this.top, (key: string) => {
+          this.tabletLetterKey(key)
+        }, (key: string) => key)
+        this.iconKey($r('app.media.ic_backspace'), '削除', () => { this.deleteText(); }, 1.2, false, true)
+      }.width('100%')
+      Row({ space: this.metrics.gap }) {
+        this.iconKey($r('app.media.ic_caps_lock'), 'Caps Lock', () => { this.capsLocked = !this.capsLocked; this.upper = false; }, 1.5, false, false, this.capsLocked)
+        ForEach(this.middle, (key: string) => {
+          this.tabletLetterKey(key)
+        }, (key: string) => key)
+        this.enterKey(1.9)
+      }.width('100%')
+      Row({ space: this.metrics.gap }) {
+        this.iconKey($r('app.media.ic_shift'), '左Shift', () => { this.upper = !this.upper; this.capsLocked = false; }, 1.8, false, false, this.upper)
+        ForEach(this.bottom, (key: string) => {
+          this.tabletLetterKey(key)
+        }, (key: string) => key)
+        this.keyboardKey(',', () => { if (this.mode === 'romaji') { this.romajiText(','); } else { this.insertText(','); } })
+        this.keyboardKey('.', () => { if (this.mode === 'romaji') { this.romajiText('.'); } else { this.insertText('.'); } })
+        if (this.mode === 'romaji') {
+          this.keyboardKey('ー', () => { this.romajiText('-'); }, 1.6, true)
+        } else {
+          this.iconKey($r('app.media.ic_shift'), '右Shift', () => { this.upper = !this.upper; this.capsLocked = false; }, 1.6, false, false, this.upper)
+        }
+      }.width('100%')
+      Row({ space: this.metrics.gap }) {
+        this.modeKey()
+        this.iconKey($r('app.media.ic_emoji'), '絵文字', () => { this.openEmoji(); })
+        this.iconKey($r('app.media.ic_globe'), '入力言語', () => { imeController.switchInputMethod(); })
+        this.keyboardKey(this.mode === 'romaji' ? '日本語' : 'English', () => { if (this.mode === 'romaji' && this.shownReading().length > 0) { this.convertText(); } else { this.spaceText(); } }, 6.4)
+        this.cursorKey(-1)
+        this.cursorKey(1)
+        this.keyboardKey('?123', () => { this.changeMode('number'); }, 1, true)
       }.width('100%')
     }.width('100%')
   }
@@ -699,16 +865,20 @@ struct Keyboard {
     Column() {
       Blank().height(this.popupInset).hitTestBehavior(HitTestMode.None)
       Column() {
-        if (this.mode === 'clipboard') {
+        if (this.mode === 'prediction') {
+          PredictionPanel({ metrics: this.metrics, onReturn: () => { this.mode = this.predictionReturnMode; } }).layoutWeight(1)
+        } else if (this.mode === 'clipboard') {
           ClipboardPanel({ metrics: this.metrics, returnLabel: this.clipboardReturnMode === 'alpha' ? 'ABC' : (this.clipboardReturnMode === 'number' ? '123' : 'あいう'),
+            onAdd: () => { this.beginClipboardAdd(); },
             onReturn: () => { this.changeMode(this.clipboardReturnMode); } }).layoutWeight(1)
         } else if (this.mode === 'emoji') {
           EmojiPanel({ metrics: this.metrics, query: this.emojiQuery, returnLabel: this.emojiReturnMode === 'alpha' ? 'ABC' : (this.emojiReturnMode === 'number' ? '123' : 'あいう'),
+            onInsert: (text: string) => { this.insertText(text); }, onDelete: () => { this.deleteText(); },
             onSearch: (query: string) => { this.beginEmojiSearch(query); },
             onReturn: () => { this.emojiQuery = ''; this.changeMode(this.emojiReturnMode); }, onSymbols: () => { this.changeMode('symbol'); } }).layoutWeight(1)
         } else {
         this.keyboardToolbar()
-        if (this.candidatesExpanded && this.shownReading().length > 0) {
+        if (this.candidatesExpanded && (this.shownReading().length > 0 || this.nextCandidates)) {
           Scroll() {
             Column() {
               ForEach(this.candidateLines, (row: CandidateRow) => {
@@ -722,6 +892,8 @@ struct Keyboard {
                         Divider().vertical(true).height(this.metrics.toolbarHeight * 0.46).color(KeyboardPalette.divider)
                       }
                     }.width((row.spans[index] * 25).toString() + '%').height(this.metrics.toolbarHeight * 0.84)
+                      .id('expanded-candidate-' + value)
+                      .gesture(LongPressGesture().onAction(() => { if (!this.privateMode) { this.requestCandidateRemoval(value, row.context); } }))
                       .onClick(() => {
                         keyboardHaptics.tap();
                         this.flushFlicks();
@@ -733,11 +905,12 @@ struct Keyboard {
               }, (row: CandidateRow) => row.context.toString() + row.values.join('\u0001'))
             }.width('100%')
           }.align(Alignment.TopStart).scrollBar(BarState.Off).layoutWeight(1).width('100%')
-        } else if (this.mode === 'kana') { this.kanaKeys(); } else if (this.mode === 'alpha') { this.alphabet12Keys(); } else if (this.mode === 'romaji') { this.alphaKeys(); } else if (this.mode === 'number' && !this.forceNumber) { this.number12Keys(); } else { this.numberKeys(); }
+        } else if (this.mode === 'kana') { this.kanaKeys(); } else if (this.mode === 'alpha') { if (this.metrics.tablet && this.alphabetQwerty) { this.tabletAlphaKeys(); } else { this.alphabet12Keys(); } } else if (this.mode === 'romaji') { if (this.metrics.tablet) { this.tabletAlphaKeys(); } else { this.alphaKeys(); } } else if (this.mode === 'number' && !this.forceNumber) { this.number12Keys(); } else { this.numberKeys(); }
         }
         if (this.error.length > 0) { Text(this.error).fontSize(11).fontColor('#B42318').height(16) }
       }.padding({ left: this.metrics.margin, right: this.metrics.margin, bottom: this.metrics.bottomPadding })
-        .width('100%').height(this.metrics.panelHeight).backgroundColor(KeyboardPalette.panel)
+        .width('100%').height(this.metrics.panelHeight).backgroundColor(this.mode === 'clipboard' ? KeyboardPalette.clipboardPanel :
+          (this.mode === 'emoji' ? KeyboardPalette.emojiPanel : KeyboardPalette.panel))
         .onAreaChange((_oldArea: Area, area: Area) => {
           const width = Number(area.width); const height = Number(area.height);
           if (width > 0 && height > 0 && (width !== this.layoutWidth || height !== this.layoutHeight)) {

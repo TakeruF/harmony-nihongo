@@ -34,7 +34,7 @@ struct Index {
           this.text = previewFieldValue(value, preview?.value ?? '', preview?.offset ?? 0);
         })
       Text('検索アクション: ' + this.searchCount).id('searchCount').fontSize(12)
-      Text('かなをフリックするとMozcの漢字候補が表示されます。候補をタップすると確定できます。')
+      Text('かなを入力すると漢字候補が表示されます。確定後も次の語句を選べます。キーボードの歯車から予測・学習を設定できます。')
         .fontSize(14).fontColor('#64748B')
     }.padding(24).width('100%').height('100%').backgroundColor('#F6F7FB')
   }

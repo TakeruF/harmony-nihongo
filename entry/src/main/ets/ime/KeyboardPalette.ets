@@ -11,4 +11,12 @@ export class KeyboardPalette {
   static readonly ink: string = '#1A1B21';
   static readonly selectedInk: string = '#304B91';
   static readonly divider: string = '#C8CAE1';
+  // OPPO Find X9 Pro Gboard panel reference, captured 2026-10-10.
+  static readonly clipboardPanel: string = '#E6E3FE';
+  static readonly panelCard: string = '#FFFDFF';
+  static readonly emojiPanel: string = '#EFECFD';
+  static readonly panelButton: string = '#DDDCFB';
+  static readonly panelAccent: string = '#638EF1';
+  static readonly panelSelected: string = '#D5E0F5';
+  static readonly panelInk: string = '#29283F';
 }

@@ -5,6 +5,14 @@ import nativeEngine from 'libnihongo.so';
 // Dictionary and profile live inside the IME sandbox, including BASIC mode.
 export class MozcEngine {
   private ready: boolean = false;
+  async predictNext(value: string, privateMode: boolean): Promise<string[][]> {
+    if (!this.ready || value.length === 0 || value.length > 256) { return []; }
+    return nativeEngine.predictNext(value, privateMode);
+  }
+  async clearLearning(): Promise<boolean> {
+    if (!this.ready) { return false; }
+    return nativeEngine.clearLearning();
+  }
   async initialize(context: InputMethodExtensionContext): Promise<void> {
     const dictionary = context.filesDir + '/mozc-60fe4012.data';
     if (!fs.accessSync(dictionary)) {

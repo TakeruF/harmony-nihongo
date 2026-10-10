@@ -7,3 +7,5 @@ export const segments: (reading: string, privateMode: boolean) => Promise<string
 export const learnSegments: (reading: string, values: string[], keys: string[]) => Promise<boolean>;
 export const resizeSegments: (reading: string, lengths: number[], focus: number, delta: number, privateMode: boolean) => Promise<string[][]>;
 export const reverse: (text: string) => Promise<string>;
+export const predictNext: (value: string, privateMode: boolean) => Promise<string[][]>;
+export const clearLearning: () => Promise<boolean>;

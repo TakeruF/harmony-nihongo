@@ -1,0 +1,398 @@
+{
+  "upstream_repository": "https://github.com/google/material-design-icons",
+  "upstream_commit": "49d4db35df873165d6bd6ba09b063c7dafbac2f4",
+  "style": "Material Symbols Rounded",
+  "optical_size": 24,
+  "weight": 400,
+  "grade": 0,
+  "fill": 0,
+  "icons": [
+    {
+      "file": "ic_activity.svg",
+      "symbol": "sports_soccer",
+      "color": "#737782",
+      "upstream_path": "symbols/web/sports_soccer/materialsymbolsrounded/sports_soccer_24px.svg",
+      "view_box": "0 -960 960 960",
+      "source_sha256": "f04c114207da523d2c8d69727e169e29c97cca31bd78a18febe63c6ab31e2989",
+      "bundled_sha256": "1a8ededfd0a872647dd01a07e08918d5480697c3c96da55d136ff7a01fcbea89"
+    },
+    {
+      "file": "ic_activity_selected.svg",
+      "symbol": "sports_soccer",
+      "color": "#1A1B21",
+      "upstream_path": "symbols/web/sports_soccer/materialsymbolsrounded/sports_soccer_24px.svg",
+      "view_box": "0 -960 960 960",
+      "source_sha256": "f04c114207da523d2c8d69727e169e29c97cca31bd78a18febe63c6ab31e2989",
+      "bundled_sha256": "b933b9947aa535a42da9d11ae37ce451ea185ba964cd9b53891829c717ef11e8"
+    },
+    {
+      "file": "ic_add.svg",
+      "symbol": "add",
+      "color": "#29283F",
+      "upstream_path": "symbols/web/add/materialsymbolsrounded/add_24px.svg",
+      "view_box": "0 -960 960 960",
+      "source_sha256": "747fe04ec3eb546a96f514a5d2df9e81be53397818b83f05630519ab008bb6e9",
+      "bundled_sha256": "f40dc451d5838c62cc8a1fc625832156e91883e470888c6b8cf8ba7afb2e83b1"
+    },
+    {
+      "file": "ic_back.svg",
+      "symbol": "arrow_back",
+      "color": "#29283F",
+      "upstream_path": "symbols/web/arrow_back/materialsymbolsrounded/arrow_back_24px.svg",
+      "view_box": "0 -960 960 960",
+      "source_sha256": "b9b58d54e13e0e3693a10d997c1001ec270c12eaa935f993cee1d8c916236ceb",
+      "bundled_sha256": "fd31a44e8267827ae6c20b9d5fe825c91617d10a5b92977591df0494236370d6"
+    },
+    {
+      "file": "ic_backspace.svg",
+      "symbol": "backspace",
+      "color": "#1A1B21",
+      "upstream_path": "symbols/web/backspace/materialsymbolsrounded/backspace_24px.svg",
+      "view_box": "0 -960 960 960",
+      "source_sha256": "94907e1155db6b6b29fbd05429ee6de52f145540937aba5e4561912fcfb727bf",
+      "bundled_sha256": "fa0d3b4c3c8c91734e6f90a7c472710c3fcd22c72a4281ac82b871834315fdc4"
+    },
+    {
+      "file": "ic_caps_lock.svg",
+      "symbol": "keyboard_capslock",
+      "color": "#1A1B21",
+      "upstream_path": "symbols/web/keyboard_capslock/materialsymbolsrounded/keyboard_capslock_24px.svg",
+      "view_box": "0 -960 960 960",
+      "source_sha256": "8d3d22dc5e3fd92000625412b53afa21d9a648e29616c82fd754076751f0d107",
+      "bundled_sha256": "76e5a15f4ce13d01a184c6147eed4587b877b694e4557e7b4e32288987bb6073"
+    },
+    {
+      "file": "ic_check.svg",
+      "symbol": "check",
+      "color": "#29283F",
+      "upstream_path": "symbols/web/check/materialsymbolsrounded/check_24px.svg",
+      "view_box": "0 -960 960 960",
+      "source_sha256": "51e706757e18de60cb7ade1cf0ae272708932d36e417365f14977ee039cd85b8",
+      "bundled_sha256": "a83527ed78571d829e5aebac08437dce832d033fde11748c337a2ec133128964"
+    },
+    {
+      "file": "ic_clipboard.svg",
+      "symbol": "content_paste",
+      "color": "#1A1B21",
+      "upstream_path": "symbols/web/content_paste/materialsymbolsrounded/content_paste_24px.svg",
+      "view_box": "0 -960 960 960",
+      "source_sha256": "ecabc7b59e8540b6e0f2946043b6c32f2dc54591ec50496165a61c7a9b53db72",
+      "bundled_sha256": "7917eb56b207c274683c6f21901a3d746766b8af0d1fa09c533fb1285a09b07c"
+    },
+    {
+      "file": "ic_clipboard_toggle.svg",
+      "symbol": "toggle_on",
+      "color": "#29283F",
+      "upstream_path": "symbols/web/toggle_on/materialsymbolsrounded/toggle_on_24px.svg",
+      "view_box": "0 -960 960 960",
+      "source_sha256": "80c39eea0d481f62cff8e459ab5f14afcdf9010c8bf35c46ca82465035ddac85",
+      "bundled_sha256": "35646a60930979ddf4458cb69955b0a5d35ed63abbfa0aef986459bd1a19b443"
+    },
+    {
+      "file": "ic_close.svg",
+      "symbol": "close",
+      "color": "#29283F",
+      "upstream_path": "symbols/web/close/materialsymbolsrounded/close_24px.svg",
+      "view_box": "0 -960 960 960",
+      "source_sha256": "fabc7e16160e93ed11d6d72b87f5c67092d04abfcc1fc2410fab1abe075cd8fc",
+      "bundled_sha256": "93ffe9d9bb8f62f2e347acfa33bdf8b567eafd7003612ced42ab23c534a8f992"
+    },
+    {
+      "file": "ic_delete.svg",
+      "symbol": "delete",
+      "color": "#29283F",
+      "upstream_path": "symbols/web/delete/materialsymbolsrounded/delete_24px.svg",
+      "view_box": "0 -960 960 960",
+      "source_sha256": "cd90ebd4c5aa36ef2332e2511ed6dcb051a32e5c99effd60494060473f27b9f9",
+      "bundled_sha256": "b5c73dcc131cbc38c46e7c1f66e0a0ff4f03a57af5b52a76e86c681a7cb844c2"
+    },
+    {
+      "file": "ic_edit.svg",
+      "symbol": "edit",
+      "color": "#29283F",
+      "upstream_path": "symbols/web/edit/materialsymbolsrounded/edit_24px.svg",
+      "view_box": "0 -960 960 960",
+      "source_sha256": "65d2e92a5a2d761c82125ecd95aa6fd8a389b6153a631ccc260c9aa658f65ef6",
+      "bundled_sha256": "b7f17bf40ae6e9040ad2580af702a8d5186f7e746244296a25c25d88b238bd19"
+    },
+    {
+      "file": "ic_emoji.svg",
+      "symbol": "sentiment_satisfied",
+      "color": "#1A1B21",
+      "upstream_path": "symbols/web/sentiment_satisfied/materialsymbolsrounded/sentiment_satisfied_24px.svg",
+      "view_box": "0 -960 960 960",
+      "source_sha256": "e54a508b1a8cd18c1c179ea28c68b6423c6e57e61ad69b47384bd9daf023216f",
+      "bundled_sha256": "51f8bd16a5d25c2486cd5126fa40e7d7c58072119908b790f51ab654ccb9922a"
+    },
+    {
+      "file": "ic_emoji_inactive.svg",
+      "symbol": "sentiment_satisfied",
+      "color": "#737782",
+      "upstream_path": "symbols/web/sentiment_satisfied/materialsymbolsrounded/sentiment_satisfied_24px.svg",
+      "view_box": "0 -960 960 960",
+      "source_sha256": "e54a508b1a8cd18c1c179ea28c68b6423c6e57e61ad69b47384bd9daf023216f",
+      "bundled_sha256": "e4d282de108ad82092c8442c5a0c01742f0c66998b65ec28be118dec37e515f7"
+    },
+    {
+      "file": "ic_enter.svg",
+      "symbol": "keyboard_return",
+      "color": "#1A1B21",
+      "upstream_path": "symbols/web/keyboard_return/materialsymbolsrounded/keyboard_return_24px.svg",
+      "view_box": "0 -960 960 960",
+      "source_sha256": "23ca34150581a65f8675f88aff35812985f392530a25872176f6c88526e4017b",
+      "bundled_sha256": "4848e2f0bfd3bc23543178659f23ada8e1f2ae4e985e0f002332276e0e45c808"
+    },
+    {
+      "file": "ic_flag.svg",
+      "symbol": "flag",
+      "color": "#737782",
+      "upstream_path": "symbols/web/flag/materialsymbolsrounded/flag_24px.svg",
+      "view_box": "0 -960 960 960",
+      "source_sha256": "e74dc20f968a42d8121f4df417de9e129d215adf47ef57bde7ea70131cd86700",
+      "bundled_sha256": "ab41fca5bbe80451c70d1f8c7a5f180e995e31a1f5945b2ea88ade7fdcbea328"
+    },
+    {
+      "file": "ic_flag_selected.svg",
+      "symbol": "flag",
+      "color": "#1A1B21",
+      "upstream_path": "symbols/web/flag/materialsymbolsrounded/flag_24px.svg",
+      "view_box": "0 -960 960 960",
+      "source_sha256": "e74dc20f968a42d8121f4df417de9e129d215adf47ef57bde7ea70131cd86700",
+      "bundled_sha256": "b3ef4f2af1d53803dd38d26abf669cd31fe505045117eabfa6d483aab7b6dcb6"
+    },
+    {
+      "file": "ic_food.svg",
+      "symbol": "restaurant",
+      "color": "#737782",
+      "upstream_path": "symbols/web/restaurant/materialsymbolsrounded/restaurant_24px.svg",
+      "view_box": "0 -960 960 960",
+      "source_sha256": "45cb5f6db38ce6d7e8755f211a3fa0b6f5cf6cb54f7a66c78ae42235496f9b8b",
+      "bundled_sha256": "8158704e803ec520d9c1ddad922df92441cb54edbad2e33ae4d7e6d6fd8ff43d"
+    },
+    {
+      "file": "ic_food_selected.svg",
+      "symbol": "restaurant",
+      "color": "#1A1B21",
+      "upstream_path": "symbols/web/restaurant/materialsymbolsrounded/restaurant_24px.svg",
+      "view_box": "0 -960 960 960",
+      "source_sha256": "45cb5f6db38ce6d7e8755f211a3fa0b6f5cf6cb54f7a66c78ae42235496f9b8b",
+      "bundled_sha256": "8c57928f8765f7aef494395f1c108ec1e25d07c8435e766a3a699f4ff40de6e8"
+    },
+    {
+      "file": "ic_globe.svg",
+      "symbol": "language",
+      "color": "#1A1B21",
+      "upstream_path": "symbols/web/language/materialsymbolsrounded/language_24px.svg",
+      "view_box": "0 -960 960 960",
+      "source_sha256": "7bef4e741ed558c37c166b8f06c7abbc7c964e100057f6c725a7be40809113b0",
+      "bundled_sha256": "d7199dafcb535a31fa5cb88db78a4e2f93448445c7a6099715f325f2aaf7a4c1"
+    },
+    {
+      "file": "ic_hide.svg",
+      "symbol": "keyboard_arrow_down",
+      "color": "#1A1B21",
+      "upstream_path": "symbols/web/keyboard_arrow_down/materialsymbolsrounded/keyboard_arrow_down_24px.svg",
+      "view_box": "0 -960 960 960",
+      "source_sha256": "6539a5949b9a64b83f13f23e95c21f25715f140f7eac8c70f4560dc96fd6836e",
+      "bundled_sha256": "b9f2d75fb8e3201668fa7e8d58b2eeccb746f1b4ae8b27c1b84c3cf62031bcad"
+    },
+    {
+      "file": "ic_keyboard.svg",
+      "symbol": "keyboard",
+      "color": "#1A1B21",
+      "upstream_path": "symbols/web/keyboard/materialsymbolsrounded/keyboard_24px.svg",
+      "view_box": "0 -960 960 960",
+      "source_sha256": "0a86d3a3fed03e8cc446e30345a81c947e6c8b24d618ba5b60e6b23d5066e289",
+      "bundled_sha256": "db7ebe981a0326c7e68cc77e399b6044f7398359083f635a6807818f9c7e191d"
+    },
+    {
+      "file": "ic_left.svg",
+      "symbol": "arrow_left",
+      "color": "#1A1B21",
+      "upstream_path": "symbols/web/arrow_left/materialsymbolsrounded/arrow_left_24px.svg",
+      "view_box": "0 -960 960 960",
+      "source_sha256": "893e8df6715ebacf83a2b5fcb0a1b526062059bdd1e846e1e6bbe75d88405365",
+      "bundled_sha256": "e90800a13c8782d155ef3239e0975c06e16d44ed5b44e6525dd6183e05f649f7"
+    },
+    {
+      "file": "ic_nature.svg",
+      "symbol": "pets",
+      "color": "#737782",
+      "upstream_path": "symbols/web/pets/materialsymbolsrounded/pets_24px.svg",
+      "view_box": "0 -960 960 960",
+      "source_sha256": "36de9fdf4f0dd9b9df0240bd3a88ad26a648bfbffe8fd53caf1de4a8f4114fb9",
+      "bundled_sha256": "2c35885d4001078a66e8b43e23fc93d5b81cc4745846583bffecd775d3a7d7c6"
+    },
+    {
+      "file": "ic_nature_selected.svg",
+      "symbol": "pets",
+      "color": "#1A1B21",
+      "upstream_path": "symbols/web/pets/materialsymbolsrounded/pets_24px.svg",
+      "view_box": "0 -960 960 960",
+      "source_sha256": "36de9fdf4f0dd9b9df0240bd3a88ad26a648bfbffe8fd53caf1de4a8f4114fb9",
+      "bundled_sha256": "6c8064301c9e49acdc9dd7cc1e3a7a5a70bc496dd9eeac77d90104e42f2dc377"
+    },
+    {
+      "file": "ic_object.svg",
+      "symbol": "lightbulb",
+      "color": "#737782",
+      "upstream_path": "symbols/web/lightbulb/materialsymbolsrounded/lightbulb_24px.svg",
+      "view_box": "0 -960 960 960",
+      "source_sha256": "1aff3e2b989d4cdff56591e03cf3beff2a826051c91a3de3e72a87b7827db820",
+      "bundled_sha256": "e1aa47f13bee109115a0e749f1c0608347df40663841e7e240669295d011e523"
+    },
+    {
+      "file": "ic_object_selected.svg",
+      "symbol": "lightbulb",
+      "color": "#1A1B21",
+      "upstream_path": "symbols/web/lightbulb/materialsymbolsrounded/lightbulb_24px.svg",
+      "view_box": "0 -960 960 960",
+      "source_sha256": "1aff3e2b989d4cdff56591e03cf3beff2a826051c91a3de3e72a87b7827db820",
+      "bundled_sha256": "d72f2db691426267daf676204813baafeb110110ce01bdd26b0e6c035c42954d"
+    },
+    {
+      "file": "ic_person.svg",
+      "symbol": "accessibility_new",
+      "color": "#737782",
+      "upstream_path": "symbols/web/accessibility_new/materialsymbolsrounded/accessibility_new_24px.svg",
+      "view_box": "0 -960 960 960",
+      "source_sha256": "d1e246f9f7c04254c1870b2905a2e6025a1b09d98deaee87c9da49baa37c3954",
+      "bundled_sha256": "cf6e80e83cd23aa433f91dbbd6c3806914bb3c5c39640e0c88a9287d73c56d0c"
+    },
+    {
+      "file": "ic_person_selected.svg",
+      "symbol": "accessibility_new",
+      "color": "#1A1B21",
+      "upstream_path": "symbols/web/accessibility_new/materialsymbolsrounded/accessibility_new_24px.svg",
+      "view_box": "0 -960 960 960",
+      "source_sha256": "d1e246f9f7c04254c1870b2905a2e6025a1b09d98deaee87c9da49baa37c3954",
+      "bundled_sha256": "31c07bfe7b1a0930a03c4065388dc44d6e026535bc40daa86ece76ee655e59b1"
+    },
+    {
+      "file": "ic_pin.svg",
+      "symbol": "push_pin",
+      "color": "#29283F",
+      "upstream_path": "symbols/web/push_pin/materialsymbolsrounded/push_pin_24px.svg",
+      "view_box": "0 0 24 24",
+      "source_sha256": "8b95c9b784cd4901f1fe09d5c4076f42f5af3f9e7173fc49a93eb1bd82377bcd",
+      "bundled_sha256": "c8d6ab57eb49fc56527a04303feef5a2053888112a0780caab87cd0f1b39bcf0"
+    },
+    {
+      "file": "ic_recent.svg",
+      "symbol": "schedule",
+      "color": "#737782",
+      "upstream_path": "symbols/web/schedule/materialsymbolsrounded/schedule_24px.svg",
+      "view_box": "0 -960 960 960",
+      "source_sha256": "a0521ebc40eafb5a1c02dc3c966d8f342688fae78062b46ade248af94a161b28",
+      "bundled_sha256": "37b68218456e9c17add919f9c665c6575938d26cb1a3db24a5ddbf5dc22e1f20"
+    },
+    {
+      "file": "ic_recent_selected.svg",
+      "symbol": "schedule",
+      "color": "#1A1B21",
+      "upstream_path": "symbols/web/schedule/materialsymbolsrounded/schedule_24px.svg",
+      "view_box": "0 -960 960 960",
+      "source_sha256": "a0521ebc40eafb5a1c02dc3c966d8f342688fae78062b46ade248af94a161b28",
+      "bundled_sha256": "dcc405382f86f7939af23ff96ed92b94eabd2279f1f88579e6c7802c178130cb"
+    },
+    {
+      "file": "ic_right.svg",
+      "symbol": "arrow_right",
+      "color": "#1A1B21",
+      "upstream_path": "symbols/web/arrow_right/materialsymbolsrounded/arrow_right_24px.svg",
+      "view_box": "0 -960 960 960",
+      "source_sha256": "9a3b48ba38afa5df03d0205a54bc381a433da56349066823d7353c2d2671720c",
+      "bundled_sha256": "b235d1888a3519608b56dbb83caccd6eb3a6cdd8d0bbc0c6ffbaf6735be3c3e8"
+    },
+    {
+      "file": "ic_search.svg",
+      "symbol": "search",
+      "color": "#1A1B21",
+      "upstream_path": "symbols/web/search/materialsymbolsrounded/search_24px.svg",
+      "view_box": "0 -960 960 960",
+      "source_sha256": "8d12ac6ba27a23ccf0e57794c28481ce9c978efcb2f80ba6d2979ccdf238c993",
+      "bundled_sha256": "257830e84b6d4bec766ed0259e716f9da754e44fd8ed8e6f5bbb313f208c8dc6"
+    },
+    {
+      "file": "ic_settings.svg",
+      "symbol": "settings",
+      "color": "#1A1B21",
+      "upstream_path": "symbols/web/settings/materialsymbolsrounded/settings_24px.svg",
+      "view_box": "0 -960 960 960",
+      "source_sha256": "6cd47de90647ece6b00922f497f8c4ea9c1649548cf15828d1df9d78d5bdf30d",
+      "bundled_sha256": "36eab7ade932231bb305b4d028b4bd4120e24c7a6fc95102716e055adbded010"
+    },
+    {
+      "file": "ic_shift.svg",
+      "symbol": "shift",
+      "color": "#1A1B21",
+      "upstream_path": "symbols/web/shift/materialsymbolsrounded/shift_24px.svg",
+      "view_box": "0 -960 960 960",
+      "source_sha256": "b30e4efe21e0e9b5d589073260ff7953fdf90ce892bd9d113c444150872cb15c",
+      "bundled_sha256": "c3d76c23e77b310487c4231ace2b8f41c0d31cc0ae2002653b7442e49c6c4cc0"
+    },
+    {
+      "file": "ic_space.svg",
+      "symbol": "space_bar",
+      "color": "#1A1B21",
+      "upstream_path": "symbols/web/space_bar/materialsymbolsrounded/space_bar_24px.svg",
+      "view_box": "0 -960 960 960",
+      "source_sha256": "74c0a3d890484acce0ea45454ef04c3313cc16a7164a3210c3b86dc5afab219e",
+      "bundled_sha256": "fa3de16a2d763abc915be87e47c3144c062585fd9f63fc312a7aa3e4c1170d70"
+    },
+    {
+      "file": "ic_symbol.svg",
+      "symbol": "favorite",
+      "color": "#737782",
+      "upstream_path": "symbols/web/favorite/materialsymbolsrounded/favorite_24px.svg",
+      "view_box": "0 -960 960 960",
+      "source_sha256": "6a12c59ac484ab3a73b754bd69d5dd5319a4dafe31f88be1faeede48f57cbd17",
+      "bundled_sha256": "f2e2c2e9084322890f9b242810d3e5be56b3fad191367cbc9a4c72c18ff771fc"
+    },
+    {
+      "file": "ic_symbol_selected.svg",
+      "symbol": "favorite",
+      "color": "#1A1B21",
+      "upstream_path": "symbols/web/favorite/materialsymbolsrounded/favorite_24px.svg",
+      "view_box": "0 -960 960 960",
+      "source_sha256": "6a12c59ac484ab3a73b754bd69d5dd5319a4dafe31f88be1faeede48f57cbd17",
+      "bundled_sha256": "4cce7f89cba5d7f25df3817b1f79dd996cef22a6d47aed031b9046255d282300"
+    },
+    {
+      "file": "ic_tab.svg",
+      "symbol": "keyboard_tab",
+      "color": "#45464F",
+      "upstream_path": "symbols/web/keyboard_tab/materialsymbolsrounded/keyboard_tab_24px.svg",
+      "view_box": "0 -960 960 960",
+      "source_sha256": "658bf1c24ad62576bb2244757cb513f051358b1bd38f1a75eb638c6896d565b8",
+      "bundled_sha256": "f86e17386c0a66c275cf7ddc8744e87f15c75cd7166396a6a05914805cd347bd"
+    },
+    {
+      "file": "ic_travel.svg",
+      "symbol": "directions_car",
+      "color": "#737782",
+      "upstream_path": "symbols/web/directions_car/materialsymbolsrounded/directions_car_24px.svg",
+      "view_box": "0 -960 960 960",
+      "source_sha256": "ad8a4411bcdf92a913ab6cd45a79c4388de318471ac860ff5981f8e68d345f54",
+      "bundled_sha256": "7a969674c63974228a63c373b78a486e88f528fcdbf54809ef27c3c7d69c2d0b"
+    },
+    {
+      "file": "ic_travel_selected.svg",
+      "symbol": "directions_car",
+      "color": "#1A1B21",
+      "upstream_path": "symbols/web/directions_car/materialsymbolsrounded/directions_car_24px.svg",
+      "view_box": "0 -960 960 960",
+      "source_sha256": "ad8a4411bcdf92a913ab6cd45a79c4388de318471ac860ff5981f8e68d345f54",
+      "bundled_sha256": "5914e03eee80715948c5aa0820a82b07cdd03023607883c6aa6b042062507ec9"
+    },
+    {
+      "file": "ic_undo.svg",
+      "symbol": "undo",
+      "color": "#1A1B21",
+      "upstream_path": "symbols/web/undo/materialsymbolsrounded/undo_24px.svg",
+      "view_box": "0 -960 960 960",
+      "source_sha256": "dcd97edcb0f867c19ccff7032e8cebf08a0737898d1d480efdbc6e9468a7ee76",
+      "bundled_sha256": "5bd29b642b3dbc346d467a24fc1b81e5b06dbcf93ba784ed9d41062f9695f05d"
+    }
+  ]
+}

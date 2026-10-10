@@ -39,6 +39,25 @@ let output=''; for (let i=99;i>=0;i--) output+=f.end(i,0,30).map(x=>x.value).joi
 assert.equal(output,'お'.repeat(100));
 console.log('Kana state, transformations, five directions, overlap ordering, cancellation: PASS');
 
+// A modifier may be pressed before the kana finger is released. Flush the
+// selected kana first, transform it once, then ignore the late kana release.
+for (const [values, dx, dy, presses, expected] of [
+  [['か','き','く','け','こ'],0,0,1,'が'],
+  [['は','ひ','ふ','へ','ほ'],0,0,2,'ぱ'],
+  [['た','ち','つ','て','と'],0,-30,1,'っ'],
+]) {
+  c.clear(); f.begin(1,values,100,100,7); f.move(1,100+dx,100+dy);
+  for (const item of f.flush()) c.insert(item.value);
+  for (let i=0;i<presses;i++) c.transform('variant');
+  assert.equal(c.reading,expected);
+  assert.equal(f.end(1,100+dx,100+dy).length,0);
+  f.begin(1,['あ','い','う','え','お'],100,100,7);
+  for (const item of f.end(1,100,100)) c.insert(item.value);
+  assert.equal(c.reading,expected+'あ');
+}
+c.clear(); c.transform('variant'); assert.equal(c.reading,'');
+console.log('Overlapping kana/modifier: dakuten, double handakuten, small flick, late release and idle press: PASS');
+
 const { SettingsValues } = load('SettingsValues');
 const settings = new SettingsValues();
 assert.equal(settings.valid(),true);

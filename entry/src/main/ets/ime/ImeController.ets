@@ -1,4 +1,4 @@
-import { inputMethodEngine, InputMethodExtensionContext } from '@kit.IMEKit';
+import { inputMethod, inputMethodEngine, InputMethodExtensionContext } from '@kit.IMEKit';
 import { display } from '@kit.ArkUI';
 import { BusinessError, deviceInfo } from '@kit.BasicServicesKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
@@ -8,10 +8,13 @@ import { ReconversionSelection } from '../input/ReconversionSelection';
 import { SegmentComposition } from '../input/SegmentComposition';
 import { RomajiInput } from '../input/RomajiInput';
 import { clipboardHistory } from '../input/ClipboardHistory';
+import { clipboardStore } from './ClipboardStore';
 import { KanaComposition } from '../input/KanaComposition';
 import { probePreviewCursor } from '../input/PreviewCursorProbe';
 import { KeyboardMetrics } from './KeyboardMetrics';
 import { MozcEngine } from './MozcEngine';
+import { personalizationStore } from './PersonalizationStore';
+import { PersonalizationValues } from '../input/Personalization';
 
 class KanaSession {
   composition: KanaComposition = new KanaComposition();
@@ -42,6 +45,43 @@ class ImeController {
   private candidateBusy: boolean = false;
   private candidates: string[] = [];
   private learningAllowed: boolean = false;
+  private previousWord: string = '';
+  private contextCursor: number = -1;
+  private nextRows: string[][] = [];
+  private learningEpoch: number = 0;
+  private learningQueue: Promise<void> = Promise.resolve();
+  private get usePersonalization(): boolean {
+    return this.learningAllowed && personalizationStore.model.personalized && !this.kana.dispatchOnlyEditor;
+  }
+  private resetPrediction(): void { this.previousWord = ''; this.contextCursor = -1; this.nextRows = []; }
+  setPredictionOption(key: string, value: boolean): void {
+    const model = personalizationStore.model;
+    const before = JSON.stringify(model.values);
+    if (key === 'private') { model.privateMode = value; }
+    else if (key === 'nextWord') { model.values.nextWord = value; }
+    else if (key === 'learning') { model.values.learning = value; }
+    else { return; }
+    if (key !== 'private' && !personalizationStore.save()) { model.restore(JSON.parse(before) as PersonalizationValues); }
+    this.learningEpoch++;
+    this.resetPrediction(); personalizationStore.publish(); this.publishKana();
+  }
+  async clearLearnedData(): Promise<boolean> {
+    this.learningEpoch++;
+    this.resetPrediction(); this.publishKana();
+    await this.learningQueue;
+    try {
+      if (!await this.engine.clearLearning()) { throw new Error('Learning reset failed'); }
+      personalizationStore.model.clear();
+      const saved = personalizationStore.save();
+      this.publishKana(); return saved;
+    } catch (_) { AppStorage.setOrCreate('imeError', '学習データを削除できませんでした'); return false; }
+  }
+  forgetCandidate(value: string, session: number, context: number): void {
+    if (session !== this.generation || context !== this.revision || value === this.kana.composition.reading ||
+        this.kana.conversion || !this.learningAllowed || personalizationStore.model.privateMode || this.candidates.indexOf(value) < 0) { return; }
+    personalizationStore.model.forget(value);
+    personalizationStore.save(); this.publishKana();
+  }
   private clipboardAllowed: boolean = false;
   get canUseClipboard(): boolean { return this.active && this.visible && this.clipboardAllowed; }
   private candidateReading: string = '';
@@ -128,6 +168,7 @@ class ImeController {
     AppStorage.setOrCreate('imeEditorWindowId', -1);
     this.queue = Promise.resolve();
     this.clearSelection();
+    this.resetPrediction();
     keyboardSettings.refresh();
     this.kana = new KanaSession();
     this.publishKana();
@@ -142,7 +183,7 @@ class ImeController {
     const actionEpoch = ++this.editorActionEpoch;
     client.getEditorAttribute().then((attr: inputMethodEngine.EditorAttribute) => {
       if (generation !== this.generation || actionEpoch !== this.editorActionEpoch) { return; }
-      if (actionEpoch === this.editorActionEpoch && this.visible) { this.publishEditorAction(attr); }
+      this.publishEditorAction(attr);
       // PATTERN_NULL is the documented generic editor type, not a failed attribute query.
       this.learningAllowed = attr.inputPattern === inputMethodEngine.PATTERN_TEXT ||
         attr.inputPattern === inputMethodEngine.PATTERN_NULL;
@@ -154,8 +195,8 @@ class ImeController {
     });
     hilog.info(0x0001, 'NihongoIME', 'EDITOR_ATTACHED');
     this.keyboard = keyboard;
-    this.visible = true;
-    AppStorage.setOrCreate('imeVisible', true);
+    // Binding does not imply a show request (for example during IME switching).
+    // Only keyboardShow owns visibility; it can arrive before panel readiness.
     AppStorage.setOrCreate('imeError', '');
     this.showPanel();
     this.probe();
@@ -166,19 +207,29 @@ class ImeController {
     AppStorage.setOrCreate('imeEditorWindowId', -1);
     this.queue = Promise.resolve();
     this.clearSelection();
+    this.resetPrediction();
     this.kana = new KanaSession();
     this.publishKana();
     this.client = undefined;
     this.keyboard = undefined;
     this.visible = false;
     AppStorage.setOrCreate('imeVisible', false);
-    this.panel?.hide().catch((err: BusinessError) => { this.report(err); });
+    // The framework owns panel teardown. An app-triggered hide during handoff
+    // can close the receiving editor's input session in compatibility apps.
+    hilog.info(0x0001, 'NihongoIME', 'EDITOR_DETACHED');
   };
-  private onShow = (): void => { this.visible = true; AppStorage.setOrCreate('imeVisible', true); this.showPanel(); };
+  private onShow = (): void => {
+    if (!this.active) { return; }
+    this.visible = true; AppStorage.setOrCreate('imeVisible', true);
+    hilog.info(0x0001, 'NihongoIME', 'KEYBOARD_SHOW_REQUESTED');
+    this.showPanel();
+  };
   private onHide = (): void => {
     this.visible = false;
+    this.resetPrediction(); this.publishKana();
     AppStorage.setOrCreate('imeVisible', false);
-    this.panel?.hide().catch((err: BusinessError) => { this.report(err); });
+    // This is a system hide notification, not a user request to close input.
+    hilog.info(0x0001, 'NihongoIME', 'KEYBOARD_HIDDEN');
   };
   private onSelection = (_oldBegin: number, _oldEnd: number, begin: number, end: number): void => {
     const state = this.kana;
@@ -193,7 +244,11 @@ class ImeController {
     this.expectedSelections = [];
     if (state.updating) { return; }
     this.selectionBegin = start; this.selectionEnd = finish; this.selectionEpoch++;
-    if (state.composition.reading.length === 0) { this.publishSelection(); return; }
+    if (state.composition.reading.length === 0) {
+      if (start !== finish || finish !== this.contextCursor) { this.resetPrediction(); this.publishKana(); }
+      else { this.publishSelection(); }
+      return;
+    }
     if (state.dispatchOnlyEditor && state.preview) {
       // The bridge does not report a reliable composing anchor. A cleared
       // editor (for example after the app's Send button) must retire the reading.
@@ -204,7 +259,7 @@ class ImeController {
     }
     if (!state.preview) {
       // Local-only composition must not follow an externally moved editor caret.
-      this.generation++; this.kana = new KanaSession(); this.publishKana(); return;
+      this.generation++; this.resetPrediction(); this.kana = new KanaSession(); this.publishKana(); return;
     }
     if (begin === end && begin === state.anchor + (state.conversion?.text.length ?? state.composition.reading.length)) { return; }
     if (begin === end && begin >= state.anchor && begin <= state.anchor + (state.conversion?.text.length ?? state.composition.reading.length)) {
@@ -220,6 +275,7 @@ class ImeController {
     // The editor finalizes preview when its selection leaves the composing range.
     // Invalidate pending editing and flicks so they cannot reopen it elsewhere.
     this.generation++;
+    this.resetPrediction();
     this.kana = new KanaSession();
     this.publishKana();
   };
@@ -229,11 +285,13 @@ class ImeController {
     next.dispatchOnlyEditor = state.dispatchOnlyEditor;
     next.supported = state.supported;
     this.generation++;
+    this.resetPrediction();
     this.kana = next;
     this.publishKana();
   }
   private onTextChange = (text: string): void => {
     const state = this.kana;
+    if (text.length === 0 && !state.updating && this.previousWord.length > 0) { this.resetPrediction(); this.publishKana(); }
     if (state.dispatchOnlyEditor && state.preview && !state.updating && text.length === 0) {
       this.retireBridgeComposition(state);
     }
@@ -265,12 +323,13 @@ class ImeController {
     this.publishEditorAction(attr);
     this.learningAllowed = attr.inputPattern === inputMethodEngine.PATTERN_TEXT ||
       attr.inputPattern === inputMethodEngine.PATTERN_NULL;
-    this.publishSelection();
+    this.resetPrediction(); this.publishKana();
   };
   private onMode = (mode: inputMethodEngine.SecurityMode): void => { this.updateMode(mode); this.probe(); };
 
   start(context: InputMethodExtensionContext): void {
     this.context = context;
+    personalizationStore.load(context);
     const settingsReady = keyboardSettings.load(context, false).catch((err: BusinessError) => { this.report(err); });
     this.active = true;
     const lifecycle = ++this.lifecycle;
@@ -312,10 +371,11 @@ class ImeController {
       await panel.setUiContent('ime/Keyboard');
       if (!this.active || lifecycle !== this.lifecycle) { return; }
       this.ready = true;
-      if (this.active && this.visible) { await panel.show(); }
+      this.showPanel();
     }).catch((err: BusinessError) => { this.report(err); });
   }
   stop(): void {
+    clipboardStore.stop();
     clipboardHistory.clear();
     this.context = undefined;
     this.active = false;
@@ -337,7 +397,8 @@ class ImeController {
   }
   private updateMode(mode: inputMethodEngine.SecurityMode): void {
     this.clipboardAllowed = mode === inputMethodEngine.SecurityMode.FULL;
-    if (!this.clipboardAllowed) { clipboardHistory.clear(); }
+    if (!this.clipboardAllowed) { clipboardStore.stop(); clipboardHistory.clear(); }
+    else if (this.context) { clipboardStore.load(this.context); }
     AppStorage.setOrCreate('imeClipboardAllowed', this.clipboardAllowed);
     AppStorage.setOrCreate('imeHapticsAllowed', mode === inputMethodEngine.SecurityMode.FULL);
     AppStorage.setOrCreate('imeCanOpenSettings', mode !== inputMethodEngine.SecurityMode.BASIC);
@@ -352,7 +413,7 @@ class ImeController {
     } catch (err) { this.report(err as BusinessError); AppStorage.setOrCreate('imeNativeStatus', 'C++ NG'); }
   }
   private showPanel(): void {
-    if (!this.ready) { return; }
+    if (!this.ready || !this.active || !this.visible || !this.client) { return; }
     this.panel?.show().catch((err: BusinessError) => { this.report(err); });
   }
   private enqueue(action: (client: inputMethodEngine.InputClient) => Promise<boolean>): void {
@@ -411,7 +472,10 @@ class ImeController {
     AppStorage.setOrCreate('imeCandidateContext', this.revision);
     AppStorage.setOrCreate('imeSegmentValue', conversion?.value ?? '');
     AppStorage.setOrCreate('imeSegmentMode', conversion !== undefined);
-    AppStorage.setOrCreate('imeCandidates', conversion ? conversion.candidates : (composition.reading.length > 0 ? [composition.reading] : []));
+    const next = composition.reading.length === 0 && this.learningAllowed ? personalizationStore.model.next(this.previousWord, []) : [];
+    if (next.length > 0) { this.candidates = next; }
+    AppStorage.setOrCreate('imeNextCandidates', composition.reading.length === 0 && next.length > 0);
+    AppStorage.setOrCreate('imeCandidates', conversion ? conversion.candidates : (composition.reading.length > 0 ? [composition.reading] : next));
     if (conversion) {
       if (this.candidateTimer >= 0) { clearTimeout(this.candidateTimer); this.candidateTimer = -1; }
     } else { this.scheduleConversion(); }
@@ -427,16 +491,28 @@ class ImeController {
     this.candidateTimer = -1;
     if (this.candidateBusy || !this.active || this.kana.conversion !== undefined) { return; }
     const reading = this.kana.composition.reading;
-    if (reading.length === 0 || this.kana.romaji.pending.length > 0) { return; }
+    if (this.kana.romaji.pending.length > 0) { return; }
+    const next = reading.length === 0;
+    const previous = this.previousWord;
+    if (next && (!this.visible || !this.learningAllowed || previous.length === 0 ||
+        !personalizationStore.model.values.nextWord || personalizationStore.model.privateMode)) { return; }
     const revision = this.revision;
     const generation = this.generation;
     this.candidateBusy = true;
     try {
-      const values = await this.engine.convert(reading, !this.learningAllowed);
+      let values: string[];
+      let rows: string[][] = [];
+      if (next) { rows = await this.engine.predictNext(previous, !this.usePersonalization); values = rows.map((row: string[]) => row[1]); }
+      else { values = await this.engine.convert(reading, !this.usePersonalization); }
       if (revision !== this.revision || generation !== this.generation || !this.active) { return; }
+      // Ineligible editors never consult the local personalized profile.
+      values = next ? personalizationStore.model.next(previous, values) :
+        (this.learningAllowed ? personalizationStore.model.rank(reading, values) : values);
       this.candidates = values.filter((value: string, index: number) => value.length > 0 && values.indexOf(value) === index && value !== reading);
       this.candidateReading = reading;
-      AppStorage.setOrCreate('imeCandidates', this.candidates.length > 0 ?
+      this.nextRows = rows;
+      AppStorage.setOrCreate('imeNextCandidates', next && this.candidates.length > 0);
+      AppStorage.setOrCreate('imeCandidates', next ? this.candidates : this.candidates.length > 0 ?
         [this.candidates[0], reading].concat(this.candidates.slice(1)) : [reading]);
     } catch (_) {
       hilog.error(0x0001, 'NihongoIME', 'MOZC_CONVERSION_FAILED');
@@ -450,6 +526,24 @@ class ImeController {
     this.enqueue(async (client: inputMethodEngine.InputClient) => {
       if (context >= 0 && context !== this.revision) { return true; }
       if (reading !== this.kana.composition.reading) { return true; }
+      if (reading.length === 0) {
+        if (!this.learningAllowed || this.candidates.indexOf(value) < 0 || this.previousWord.length === 0 ||
+            !personalizationStore.model.values.nextWord || personalizationStore.model.privateMode) { return true; }
+        const state = this.kana;
+        const previous = this.previousWord;
+        const row = this.nextRows.find((item: string[]) => item[1] === value);
+        let key = row ? row[0] : personalizationStore.model.readingFor(value, previous);
+        if (!row && key === value) {
+          try { key = await this.engine.reverse(value) || value; } catch (_) { /* The selected text remains usable. */ }
+          if (!this.ownsEditor(client, state) || (context >= 0 && context !== this.revision)) { return true; }
+        }
+        state.updating = true;
+        try {
+          if (!await this.insertEditorText(client, value) || !this.ownsEditor(client, state)) { return false; }
+          this.recordConfirmed(key, value, previous, this.contextCursor < 0 ? -1 : this.contextCursor + value.length);
+          this.publishKana(); return true;
+        } finally { state.updating = false; }
+      }
       if (this.kana.conversion) {
         if (!this.kana.conversion.select(value)) { return true; }
         return this.previewKana(client, this.kana);
@@ -535,7 +629,7 @@ class ImeController {
     const reading = state.composition.reading;
     const conversion = state.conversion;
     const value = selected === undefined ? (conversion?.text ?? reading) : selected;
-    const learn = value !== reading && this.learningAllowed && !state.dispatchOnlyEditor &&
+    const learn = value !== reading && this.usePersonalization &&
       (conversion !== undefined || selected !== undefined);
     state.updating = true;
     try {
@@ -560,14 +654,24 @@ class ImeController {
       state.conversion = undefined;
       state.reconversion = undefined;
       this.clearSelection();
+      this.recordConfirmed(reading, value, this.previousWord, state.supported ? state.anchor + value.length : -1);
       if (learn) {
-        (conversion ? this.engine.learnSegments(reading, conversion.values, conversion.keys) : this.engine.learn(reading, value)).then((saved: boolean) => {
+        const epoch = this.learningEpoch;
+        this.learningQueue = this.learningQueue.then(async () => {
+          if (epoch !== this.learningEpoch) { return; }
+          const saved = await (conversion ? this.engine.learnSegments(reading, conversion.values, conversion.keys) : this.engine.learn(reading, value));
           hilog.info(0x0001, 'NihongoIME', 'MOZC_LEARNING saved=%{public}d', saved ? 1 : 0);
         }).catch(() => { hilog.error(0x0001, 'NihongoIME', 'MOZC_LEARNING_FAILED'); });
       }
       if (state === this.kana) { this.publishKana(); }
       return true;
     } finally { state.updating = false; }
+  }
+  private recordConfirmed(reading: string, value: string, previous: string, cursor: number): void {
+    if (this.usePersonalization && personalizationStore.model.remember(reading, value, previous)) { personalizationStore.save(); }
+    this.previousWord = this.learningAllowed && !personalizationStore.model.privateMode && !/[。！？!?\n]$/.test(value) ? value : '';
+    this.contextCursor = cursor;
+    this.nextRows = [];
   }
   private insertEditorText(client: inputMethodEngine.InputClient, text: string): Promise<boolean> {
     // Android compatibility bridges can apply async mutations without replying.
@@ -646,7 +750,7 @@ class ImeController {
       const generation = this.generation;
       this.engine.reverse(original).then(async (reading: string) => {
         if (reading.length === 0 || reading.length > 256 || generation !== this.generation || epoch !== this.selectionEpoch || revision !== this.revision) { return; }
-        const rows = await this.engine.segments(reading, !this.learningAllowed);
+        const rows = await this.engine.segments(reading, !this.usePersonalization);
         if (rows.length === 0 || generation !== this.generation || epoch !== this.selectionEpoch || revision !== this.revision || this.selectionBegin !== start || this.selectionEnd !== end || !this.active) { return; }
         const conversion = new SegmentComposition(reading, rows);
         this.enqueue(async (current: inputMethodEngine.InputClient) => {
@@ -688,7 +792,7 @@ class ImeController {
       const reading = state.composition.reading;
       const revision = this.revision;
       const generation = this.generation;
-      this.engine.segments(reading, !this.learningAllowed).then((rows: string[][]) => {
+      this.engine.segments(reading, !this.usePersonalization).then((rows: string[][]) => {
         if (generation !== this.generation || revision !== this.revision || !this.active || rows.length === 0) { return; }
         const conversion = new SegmentComposition(reading, rows);
         this.enqueue(async (client: inputMethodEngine.InputClient) => {
@@ -716,7 +820,7 @@ class ImeController {
       const lengths = conversion.lengths;
       if (lengths[conversion.focus] + delta <= 0 || (delta > 0 && conversion.focus === conversion.count - 1)) { return true; }
       const revision = this.revision;
-      this.engine.resizeSegments(conversion.reading, lengths, conversion.focus, delta, !this.learningAllowed).then((rows: string[][]) => {
+      this.engine.resizeSegments(conversion.reading, lengths, conversion.focus, delta, !this.usePersonalization).then((rows: string[][]) => {
         if (session !== this.generation || revision !== this.revision || !this.active || rows.length === 0) { return; }
         const next = conversion.resized(rows);
         this.enqueue(async (client: inputMethodEngine.InputClient) => {
@@ -725,6 +829,13 @@ class ImeController {
           return this.previewKana(client, state);
         });
       }).catch(() => { hilog.error(0x0001, 'NihongoIME', 'MOZC_RESIZE_FAILED'); });
+      return true;
+    });
+  }
+  switchInputMethod(): void {
+    this.enqueue(async (client: inputMethodEngine.InputClient) => {
+      if (!await this.commitState(client, this.kana)) { return false; }
+      await inputMethod.getInputMethodSetting().showOptionalInputMethods();
       return true;
     });
   }
@@ -766,6 +877,7 @@ class ImeController {
     this.enqueue(async (client: inputMethodEngine.InputClient) => {
       if (!this.canUseClipboard || !await this.commitState(client, this.kana)) { return false; }
       if (session !== this.generation || !this.canUseClipboard) { return false; }
+      this.resetPrediction(); this.publishKana();
       return this.insertEditorText(client, text);
     });
   }
@@ -773,17 +885,21 @@ class ImeController {
     this.enqueue(async (client: inputMethodEngine.InputClient) => {
       const state = this.kana;
       if (!await this.commitState(client, state) || !this.ownsEditor(client, state)) { return false; }
+      this.resetPrediction(); this.publishKana();
       return this.insertEditorText(client, text);
     });
   }
   kanaSpace(): void {
-    this.enqueue((client: inputMethodEngine.InputClient) => this.kana.composition.reading.length > 0 ?
-      this.commitState(client, this.kana) : this.insertEditorText(client, keyboardSettings.enabled('imeHalfSpace') ? ' ' : '　'));
+    this.enqueue((client: inputMethodEngine.InputClient) => {
+      if (this.kana.composition.reading.length > 0) { return this.commitState(client, this.kana); }
+      this.resetPrediction(); this.publishKana();
+      return this.insertEditorText(client, keyboardSettings.enabled('imeHalfSpace') ? ' ' : '　');
+    });
   }
   backspace(): void {
     this.enqueue(async (client: inputMethodEngine.InputClient) => {
       const state = this.kana;
-      if (state.composition.reading.length === 0) { return this.deleteEditorText(client); }
+      if (state.composition.reading.length === 0) { this.resetPrediction(); this.publishKana(); return this.deleteEditorText(client); }
       if (state.reconversion) { return this.cancelReconversion(client, state); }
       if (state.conversion) { state.conversion = undefined; return this.previewKana(client, state); }
       state.romaji.erase();
@@ -795,6 +911,7 @@ class ImeController {
     this.enqueue(async (client: inputMethodEngine.InputClient) => {
       const state = this.kana;
       if (state.composition.reading.length > 0) { return this.commitState(client, state); }
+      this.resetPrediction(); this.publishKana();
       if (state.dispatchOnlyEditor) {
         const type = this.editorEnterType;
         if (type === inputMethodEngine.ENTER_KEY_TYPE_NEWLINE || type === inputMethodEngine.ENTER_KEY_TYPE_UNSPECIFIED) {
@@ -819,6 +936,7 @@ class ImeController {
         this.kana.composition.move(delta); return this.previewKana(client, this.kana);
       }
       const direction = delta < 0 ? inputMethodEngine.Direction.CURSOR_LEFT : inputMethodEngine.Direction.CURSOR_RIGHT;
+      this.resetPrediction(); this.publishKana();
       if (this.kana.dispatchOnlyEditor) {
         await this.dispatchEditorOperation(client, () => client.moveCursor(direction).then(() => true));
       } else { await client.moveCursor(direction); }

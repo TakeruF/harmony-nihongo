@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Final layout, conversion, editor action, language selector and rotation checks."""
+"""Final layout, conversion, editor action, persistent modifier and rotation checks."""
 import importlib.util
 import json
 import re
@@ -142,13 +142,12 @@ assert d.one('key-確定', tree)
 d.capture('portrait-preserves-reading', 'きょうは')
 
 d.reset()
-d.tap('key-入力言語')
-time.sleep(.4)
 tree = d.nodes()
-(d.out / 'language-selector.json').write_text(json.dumps(tree, ensure_ascii=False, indent=2) + '\n')
-remote = '/data/local/tmp/language-selector.png'
-d.call('shell', 'uitest screenCap -p ' + remote)
-d.call('file', 'recv', remote, str(d.out / 'language-selector.png'))
-assert any(n.get('type') == 'Dialog' for n in tree), 'Language selector dialog did not open'
-print('Final layout, conversion, search action, rotation and language selector: PASS', flush=True)
+assert not any(n.get('id') == 'key-入力言語' for n in tree), 'Keyboard must not duplicate the OS language key'
+d.one('key-文字変形', tree)
+d.tap('key-文字変形'); d.wait_value('')
+d.tap('key-か'); d.tap('key-文字変形'); d.wait_value('が')
+d.capture('modifier-without-language-key', 'が')
+d.reset()
+print('Final layout, conversion, search action, rotation and persistent modifier key: PASS', flush=True)
 (d.out / 'input-results.json').write_text(json.dumps(d.results, ensure_ascii=False, indent=2) + '\n')

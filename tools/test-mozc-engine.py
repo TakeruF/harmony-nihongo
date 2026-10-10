@@ -19,7 +19,7 @@ shutil.copyfile(ROOT/'tools/mozc/engine_probe.cc', SRC/'android/jni/nihongo_prob
 with (OUT/'host-build.txt').open('w') as log:
     subprocess.run([str(ROOT/'.native-build/bin/bazel'), '--output_user_root=/tmp/nihongo-bazel-root', 'build', '//android/jni:nihongo_host_probe', '--config=oss_macos', '--config=release_build', '--jobs=6'],cwd=SRC,stdout=log,stderr=subprocess.STDOUT,check=True)
 with tempfile.TemporaryDirectory(prefix='nihongo-learning-') as profile:
-    for name, reading, value in [('prediction','にほ','日本'),('learning','はし','箸'),('learning-restart','はし','箸'),('segments','わたしははしをわたる','--segments'),('resize','わたしははしをわたる','--resize'),('reverse','橋','--reverse')]:
+    for name, reading, value in [('prediction','にほ','日本'),('learning','はし','箸'),('learning-restart','はし','箸'),('segments','わたしははしをわたる','--segments'),('resize','わたしははしをわたる','--resize'),('reverse','橋','--reverse'),('next-greeting','おはよう','--next'),('next-today','今日は','--next'),('next-school','学校','--next'),('next-work','仕事','--next'),('next-japanese','日本語','--next'),('next-movie','映画','--next'),('next-verb','食べる','--next'),('next-polite','行きます','--next'),('next-school-particle','学校に','--next'),('next-city-particle','東京で','--next'),('next-phrase','私は学生です','--next'),('next-adjective','楽しい','--next'),('next-product','架空製品アルファ','--next'),('next-number','3','--next'),('clear-learning','はし','--clear')]:
         result = subprocess.run([str(SRC/'bazel-bin/android/jni/nihongo_host_probe'), str(ROOT/'entry/src/main/resources/rawfile/mozc.data'),profile,reading,value],text=True,capture_output=True)
         (OUT/(name+'.txt')).write_text(result.stdout+result.stderr)
         if result.returncode: raise RuntimeError(name+': '+result.stdout+result.stderr)

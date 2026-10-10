@@ -12,9 +12,11 @@ extern "C" const char* nihongo_engine_segment_value(int, int);
 extern "C" int nihongo_engine_learn_segments(const char*, const char* const*, const char* const*, int);
 extern "C" int nihongo_engine_resize(const char*, const int*, int, int, int, int);
 extern "C" const char* nihongo_engine_reverse(const char*);
+extern "C" int nihongo_engine_next(const char*, int);
+extern "C" int nihongo_engine_clear_learning();
 namespace {
 std::mutex workerMutex;
-enum class EngineOperation { Initialize, Convert, Learn, Segments, LearnSegments, Resize, Reverse };
+enum class EngineOperation { Initialize, Convert, Learn, Segments, LearnSegments, Resize, Reverse, Next, ClearLearning };
 struct EngineWork {
   napi_async_work work; napi_deferred deferred;
   EngineOperation operation;
@@ -66,6 +68,8 @@ void ExecuteEngine(napi_env, void* raw) {
   auto* w = static_cast<EngineWork*>(raw);
   std::lock_guard<std::mutex> lock(workerMutex);
   switch (w->operation) {
+    case EngineOperation::ClearLearning:
+      w->success = nihongo_engine_clear_learning(); break;
     case EngineOperation::Reverse:
       w->profile = nihongo_engine_reverse(w->text.c_str()); w->success = true; break;
     case EngineOperation::Initialize:
@@ -79,8 +83,9 @@ void ExecuteEngine(napi_env, void* raw) {
       w->success = nihongo_engine_learn_segments(w->text.c_str(), values.data(), keys.data(), values.size()); break;
     }
     case EngineOperation::Segments:
+    case EngineOperation::Next:
     case EngineOperation::Resize: {
-      int count = w->operation == EngineOperation::Resize ?
+      int count = w->operation == EngineOperation::Next ? nihongo_engine_next(w->text.c_str(), w->privateMode) : w->operation == EngineOperation::Resize ?
         nihongo_engine_resize(w->text.c_str(), w->lengths.data(), w->lengths.size(), w->focus, w->delta, w->privateMode) :
         nihongo_engine_segments(w->text.c_str(), w->privateMode);
       for (int i = 0; i < count; ++i) {
@@ -114,7 +119,7 @@ void CompleteEngine(napi_env env, napi_status status, void* raw) {
   } else {
     if (w->operation == EngineOperation::Reverse) napi_create_string_utf8(env, w->profile.c_str(), w->profile.size(), &result);
     else if (w->operation == EngineOperation::Convert) result = StringArray(env, w->candidates);
-    else if (w->operation == EngineOperation::Segments || w->operation == EngineOperation::Resize) {
+    else if (w->operation == EngineOperation::Segments || w->operation == EngineOperation::Resize || w->operation == EngineOperation::Next) {
       napi_create_array_with_length(env, w->rows.size(), &result);
       for (size_t i = 0; i < w->rows.size(); ++i) napi_set_element(env, result, i, StringArray(env, w->rows[i]));
     } else napi_get_boolean(env, true, &result);
@@ -126,9 +131,9 @@ napi_value QueueEngine(napi_env env, napi_callback_info info, EngineOperation op
   size_t count = 5; napi_value args[5];
   napi_get_cb_info(env, info, &count, args, nullptr, nullptr);
   auto* w = new EngineWork{}; w->operation = operation;
-  const size_t expected = operation == EngineOperation::Reverse ? 1 : (operation == EngineOperation::Resize ? 5 : (operation == EngineOperation::LearnSegments ? 3 : 2));
-  bool valid = count == expected && ReadString(env, args[0], w->text);
-  if (valid && operation != EngineOperation::Reverse) {
+  const size_t expected = operation == EngineOperation::ClearLearning ? 0 : operation == EngineOperation::Reverse ? 1 : (operation == EngineOperation::Resize ? 5 : (operation == EngineOperation::LearnSegments ? 3 : 2));
+  bool valid = count == expected && (expected == 0 || ReadString(env, args[0], w->text));
+  if (valid && operation != EngineOperation::Reverse && operation != EngineOperation::ClearLearning) {
     if (operation == EngineOperation::Initialize || operation == EngineOperation::Learn) valid = ReadString(env, args[1], w->profile);
     else if (operation == EngineOperation::LearnSegments) valid = ReadStrings(env, args[1], w->candidates) && ReadStrings(env, args[2], w->keys) && w->keys.size() == w->candidates.size();
     else if (operation == EngineOperation::Resize) valid = ReadLengths(env, args[1], w->lengths) &&
@@ -155,4 +160,6 @@ napi_value SegmentMozc(napi_env env, napi_callback_info info) { return QueueEngi
 napi_value LearnSegmentsMozc(napi_env env, napi_callback_info info) { return QueueEngine(env, info, EngineOperation::LearnSegments); }
 napi_value ReverseMozc(napi_env env, napi_callback_info info) { return QueueEngine(env, info, EngineOperation::Reverse); }
 napi_value ResizeMozc(napi_env env, napi_callback_info info) { return QueueEngine(env, info, EngineOperation::Resize); }
+napi_value NextMozc(napi_env env, napi_callback_info info) { return QueueEngine(env, info, EngineOperation::Next); }
+napi_value ClearLearningMozc(napi_env env, napi_callback_info info) { return QueueEngine(env, info, EngineOperation::ClearLearning); }
 }

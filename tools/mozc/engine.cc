@@ -1,5 +1,7 @@
 #include <algorithm>
+#include <cstring>
 #include <deque>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -11,6 +13,7 @@
 #include "engine/engine.h"
 #include "converter/converter_interface.h"
 #include "converter/segments.h"
+#include "protocol/commands.pb.h"
 #include "request/conversion_request.h"
 namespace {
 std::mutex mutex;
@@ -79,6 +82,56 @@ int StoreSegments(const std::string& reading, bool private_mode, std::shared_ptr
     while (segment_batches.size() > 4) segment_batches.pop_front();
   }
   return segment_rows.size();
+}
+
+// ReconstructHistory only recognizes numbers and Latin letters. Japanese needs
+// the actual dictionary candidates (especially their right POS IDs) as history.
+// This is a read-only reconstruction: never FinishConversion or learn here.
+bool JapaneseHistory(const std::string& value, mozc::Segments* history) {
+  mozc::Segments reverse;
+  auto converter = engine->GetConverter();
+  if (!converter->StartReverseConversion(&reverse, value)) return false;
+  std::string reading;
+  for (const auto& part : reverse.conversion_segments()) {
+    if (!part.candidates_size()) return false;
+    reading += part.candidate(0).value;
+  }
+  if (reading.empty()) return false;
+  mozc::Segments converted;
+  auto request = Request(reading, mozc::ConversionRequest::CONVERSION, true);
+  if (!converter->StartConversion(request, &converted)) return false;
+  const size_t count = converted.conversion_segments_size();
+  if (!count || count > 64) return false;
+  std::vector<int> selected(count);
+  std::vector<std::vector<bool>> failed(count, std::vector<bool>(value.size() + 1));
+  size_t budget = 4096;
+  std::function<bool(size_t, size_t)> match = [&](size_t index, size_t offset) {
+    if (index == count) return offset == value.size();
+    if (failed[index][offset]) return false;
+    const auto& part = converted.conversion_segment(index);
+    for (size_t i = 0; i < part.candidates_size() && i < 128; ++i) {
+      if (!budget) return false;
+      --budget;
+      const auto& candidate = part.candidate(i);
+      if (candidate.value.empty() ||
+          (candidate.attributes & mozc::converter::Attribute::PARTIALLY_KEY_CONSUMED) ||
+          value.compare(offset, candidate.value.size(), candidate.value) != 0) continue;
+      selected[index] = i;
+      if (match(index + 1, offset + candidate.value.size())) return true;
+    }
+    failed[index][offset] = true;
+    return false;
+  };
+  if (!match(0, 0)) return false;
+  for (size_t i = 0; i < count; ++i) {
+    const auto& part = converted.conversion_segment(i);
+    auto* segment = history->add_segment();
+    segment->set_key(part.key());
+    segment->set_segment_type(mozc::Segment::HISTORY);
+    *segment->push_back_candidate() = part.candidate(selected[i]);
+    segment->mutable_candidate(0)->attributes |= mozc::converter::Attribute::NO_LEARNING;
+  }
+  return true;
 }
 }
 extern "C" int nihongo_engine_init(const char* dictionary, const char* profile) {
@@ -222,4 +275,42 @@ extern "C" const char* nihongo_engine_reverse(const char* text) {
     reverse_reading += segment.candidate(0).value;
   }
   return reverse_reading.c_str();
+}
+
+// Explicit, editor-local context; no process-wide last word can leak to another field.
+extern "C" int nihongo_engine_next(const char* value, int private_mode) {
+  std::lock_guard<std::mutex> lock(mutex);
+  segment_rows.clear();
+  if (!engine || !value || !*value || std::strlen(value) > 1024) return 0;
+  mozc::Segments segments;
+  if (!JapaneseHistory(value, &segments)) {
+    (void)engine->GetConverter()->ReconstructHistory(&segments, value);
+  }
+  mozc::composer::Composer composer;
+  mozc::commands::Request mobile;
+  mobile.set_zero_query_suggestion(true);
+  mobile.set_mixed_conversion(true);
+  mozc::commands::Context context;
+  context.set_preceding_text(value);
+  mozc::ConversionRequest::Options options;
+  options.request_type = mozc::ConversionRequest::PREDICTION;
+  options.incognito_mode = private_mode;
+  options.create_partial_candidates = false;
+  auto request = mozc::ConversionRequestBuilder().SetComposer(composer)
+      .SetRequest(mobile).SetContext(context).SetOptions(options).SetKey("").Build();
+  if (!engine->GetConverter()->StartPrediction(request, &segments)) return 0;
+  const auto& segment = segments.conversion_segment(0);
+  for (size_t i = 0; i < segment.candidates_size() && segment_rows.size() < 32; ++i) {
+    const auto& candidate = segment.candidate(i);
+    if (candidate.value.empty() || candidate.key.empty() ||
+        (candidate.attributes & mozc::converter::Attribute::PARTIALLY_KEY_CONSUMED)) continue;
+    segment_rows.push_back({candidate.key, candidate.value});
+  }
+  return segment_rows.size();
+}
+
+extern "C" int nihongo_engine_clear_learning() {
+  std::lock_guard<std::mutex> lock(mutex);
+  batches.clear(); segment_batches.clear();
+  return engine && engine->ClearUserHistory() && engine->Sync() && engine->Wait();
 }

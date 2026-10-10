@@ -65,9 +65,40 @@ const client={
   finishTextPreview:async()=>{committed+=preview;preview='';finishes++;},
   insertText:async text=>{inserts++;if(insertSuccess)committed+=text;return insertSuccess;},
 };
-function attach(){c.active=true;c.onStart({hide:async()=>{}},client);preview='';committed='';finishes=0;inserts=0;}
+function attach(){c.active=true;c.onStart({hide:async()=>{}},client);c.onShow();preview='';committed='';finishes=0;inserts=0;}
 async function type(text){for(const ch of text)c.kanaInput(ch,c.sessionId);await c.queue;}
 (async()=>{
+  // Switching keyboards can attach an editor before the OS requests its panel.
+  // A second app-triggered hide is interpreted by the bridge as closing input.
+  let panelShows=0, panelHides=0, keyboardHides=0;
+  const switchPanel={show:async()=>{panelShows++;},hide:async()=>{panelHides++;}};
+  const switchKeyboard={hide:async()=>{keyboardHides++;}};
+  c.active=true;c.ready=true;c.panel=switchPanel;c.onStop();
+  assert.equal(panelHides,0,'unbinding must not request another keyboard hide');
+  editorAction=2;c.onStart(switchKeyboard,client);await c.queue;
+  assert.equal(panelShows,0,'binding alone must not show the keyboard');
+  assert.equal(storage.get('imeVisible'),false);
+  assert.equal(storage.get('imeEnterLabel'),'検索','editor attributes must be ready before showing');
+  c.onShow();assert.equal(panelShows,1);assert.equal(storage.get('imeVisible'),true);
+  await type('あ');assert.equal(preview,'あ');
+  c.onHide();assert.equal(panelHides,0,'OS hide notification must not be echoed as an app hide');
+  assert.equal(storage.get('imeVisible'),false);
+  c.showPanel();assert.equal(panelShows,1,'hidden keyboard must not reopen');
+  c.onShow();assert.equal(panelShows,2);
+  c.hide();assert.equal(keyboardHides,1,'explicit close still uses KeyboardController');
+  c.onStop();assert.equal(panelHides,0);assert.equal(c.client,undefined);
+  assert.equal(storage.get('imeReading'),'');
+  // Cold panel creation must retain show intent, but a hide/stop while loading
+  // must prevent the eventual ready callback from showing a stale keyboard.
+  c.ready=false;c.onStart(switchKeyboard,client);c.onShow();assert.equal(panelShows,2);
+  c.ready=true;c.showPanel();assert.equal(panelShows,3);
+  c.ready=false;c.onHide();c.ready=true;c.showPanel();assert.equal(panelShows,3);
+  c.ready=false;c.onShow();c.onStop();c.ready=true;c.showPanel();assert.equal(panelShows,3);
+  c.onShow();assert.equal(panelShows,3,'show before binding must wait for a client');
+  c.onStart(switchKeyboard,client);assert.equal(panelShows,4,'binding honors a preceding OS show request');
+  c.onStop();c.active=false;c.onShow();c.showPanel();assert.equal(panelShows,4);
+  c.visible=false;c.panel=undefined;c.ready=false;editorAction=7;
+  console.log('IME switch lifecycle: binding/show order, no echoed hide, delayed readiness, stale stop and explicit close: PASS');
   const {SettingsValues}=load('entry/src/main/ets/input/SettingsValues.ets');
   settingFlags.set('imeFlickOnly',new SettingsValues().flickOnly);
   attach();
@@ -306,6 +337,65 @@ async function type(text){for(const ch of text)c.kanaInput(ch,c.sessionId);await
   console.log('Reconversion: selected range only, cancel restores original, fallback/failed insert, changed selection/text/client, failed read: PASS');
   console.log('Segments: multiple choices, focused context, one commit, cancel/delete, next kana, fallback/failure, stale response/editor: PASS');
   console.log('80 queued kana, stale conversion/click, preview/fallback commit, failed commit retention, editor generation: PASS');
+  const ps = load('entry/src/main/ets/ime/PersonalizationStore.ets').personalizationStore;
+  const {Personalization}=load('entry/src/main/ets/input/Personalization.ets');
+  ps.model=new Personalization();ps.save=()=>true;
+  let nextDone, nextCalls=0, resetCalls=0;
+  function predictionEngine() {c.engine={convert:async()=>['今日は'],learn:async()=>true,
+    reverse:async(value)=>value==='いい天気'?'いいてんき':value,predictNext:async()=>{nextCalls++;return [['あめ','雨']];},clearLearning:async()=>{resetCalls++;return true;}};}
+  async function commitToday() {await type('きょうは');await c.updateCandidates();c.selectCandidate('今日は','きょうは',c.sessionId,c.revision);await c.queue;}
+  inputPattern=-1;attach();predictionEngine();await commitToday();
+  assert.equal(committed,'今日は');assert.equal(storage.get('imeReading'),'');
+  assert.equal(storage.get('imeCandidates')[0],'いい天気');assert.equal(storage.get('imeNextCandidates'),true);
+  await c.updateCandidates();assert(storage.get('imeCandidates').includes('雨'));
+  const nextContext=c.revision;insertSuccess=false;
+  c.selectCandidate('いい天気','',c.sessionId,nextContext);await c.queue;
+  assert.equal(committed,'今日は');assert.equal(c.previousWord,'今日は');
+  insertSuccess=true;c.selectCandidate('いい天気','',c.sessionId,nextContext);await c.queue;
+  assert.equal(committed,'今日はいい天気');assert.equal(storage.get('imeCandidates')[0],'ですね');
+  assert(ps.model.values.words.some(word=>word.value==='いい天気'&&word.reading==='いいてんき'));
+  const wordCount=ps.model.values.words.length;
+  c.selectCandidate('雨','',c.sessionId,nextContext);await c.queue;assert.equal(committed,'今日はいい天気');
+  c.selectCandidate('ですね','',c.sessionId-1,c.revision);await c.queue;assert.equal(committed,'今日はいい天気');
+  assert.equal(ps.model.values.words.length,wordCount);
+  attach();predictionEngine();await commitToday();
+  c.engine.predictNext=()=>new Promise(resolve=>{nextDone=resolve;});
+  const pendingNext=c.updateCandidates();await type('あ');nextDone([['あめ','雨']]);await pendingNext;
+  assert.equal(storage.get('imeReading'),'あ');assert.equal(storage.get('imeNextCandidates'),false);
+  attach();predictionEngine();await commitToday();
+  c.engine.predictNext=()=>new Promise(resolve=>{nextDone=resolve;});const oldNext=c.updateCandidates();
+  attach();nextDone([['あめ','雨']]);await oldNext;assert.equal(storage.get('imeCandidates').length,0);
+  predictionEngine();await commitToday();c.onSelection(3,3,0,0);assert.equal(storage.get('imeCandidates').length,0);
+  attach();predictionEngine();await commitToday();c.onTextChange('');assert.equal(c.previousWord,'');
+  attach();predictionEngine();await commitToday();c.onHide();assert.equal(storage.get('imeCandidates').length,0);
+  attach();predictionEngine();await commitToday();
+  c.forgetCandidate('いい天気',c.sessionId,c.revision);assert(!storage.get('imeCandidates').includes('いい天気'));
+  ps.model.clear();attach();predictionEngine();await commitToday();
+  c.setPredictionOption('nextWord',false);assert.equal(storage.get('imeCandidates').length,0);
+  await type('きょうは');c.commitKana();await c.queue;assert.equal(storage.get('imeCandidates').length,0);
+  c.setPredictionOption('nextWord',true);c.setPredictionOption('private',true);
+  const privateCount=ps.model.values.words.length;await type('きょうは');await c.updateCandidates();
+  c.selectCandidate('今日は','きょうは',c.sessionId,c.revision);await c.queue;
+  assert.equal(ps.model.values.words.length,privateCount);assert.equal(storage.get('imeCandidates').length,0);
+  let privateSegments;
+  c.engine.segments=async(r,p)=>{privateSegments=p;return [['きょうは','今日は']];};
+  await type('きょうは');c.startSegmentConversion();await c.queue;await Promise.resolve();await c.queue;
+  assert.equal(privateSegments,true);c.commitKana();await c.queue;
+  assert.equal(ps.model.values.words.length,privateCount);
+  c.setPredictionOption('private',false);c.setPredictionOption('learning',false);
+  attach();predictionEngine();await commitToday();assert.equal(ps.model.values.words.length,privateCount);
+  assert.equal(storage.get('imeCandidates')[0],'いい天気');
+  c.setPredictionOption('learning',true);
+  for(const pattern of [7,8,9,11,13,99]) {
+    inputPattern=pattern;attach();predictionEngine();await type('きょうは');await c.updateCandidates();
+    c.selectCandidate('今日は','きょうは',c.sessionId,c.revision);await c.queue;
+    assert.equal(storage.get('imeCandidates').length,0);assert.equal(ps.model.values.words.length,privateCount);
+  }
+  inputPattern=-1;attach();predictionEngine();await commitToday();await c.learningQueue;
+  assert.equal(await c.clearLearnedData(),true);assert.equal(resetCalls,1);assert.equal(ps.model.values.words.length,0);
+  assert.equal(storage.get('imeCandidates').length,0);
+  console.log('Next-word controller: chained append once, failed/stale taps, stale native replies, field/caret/text/hide resets, deletion, private/disabled/password policies and learning reset: PASS');
+
   let layout, resized, getInsets;
   const panel={adjustPanelRect:(flag,rect)=>{assert.equal(flag,1);layout=rect;},resize:async(w,h)=>{resized=[w,h];},getSystemPanelCurrentInsets:async()=>({left:0,right:0,bottom:157})};
   c.panel=panel;c.active=true;await c.resizePanel();

@@ -10,3 +10,16 @@ const items=h.snapshot(t+30);h.remove(items[0].id);assert.equal(h.snapshot(t+30)
 assert.equal(h.snapshot(t+30+3600000).length,0);
 h.remember('x',t);h.clear();assert.equal(h.snapshot(t).length,0);
 console.log('Clipboard: whitespace/Unicode intact, max length, deduplication/order, 10-item limit, expiry, removal, clear: PASS');
+const pinned=new e.ClipboardHistory();
+const permanent=pinned.remember('固定した日本語😀',t);pinned.pin([permanent.id],true,t);
+pinned.remember('一時履歴',t);
+assert.equal(pinned.snapshot(t+3600001).length,1);assert.equal(pinned.snapshot(t+3600001)[0].text,'固定した日本語😀');
+for(let i=0;i<20;i++)pinned.remember('一時'+i,t+3600002);
+assert.equal(pinned.snapshot(t+3600002).length,10);assert(pinned.snapshot(t+3600002).some(x=>x.pinned));
+const duplicate=pinned.remember('固定した日本語😀',t+3600003);assert.equal(duplicate.pinned,true);
+pinned.setEnabled(false);assert.equal(pinned.snapshot(t+3600003).length,1);assert.equal(pinned.remember('disabled',t+3600003),undefined);
+pinned.setEnabled(true);pinned.pin([duplicate.id],false,t+3600004);assert.equal(pinned.snapshot(t+7200005).length,0);
+pinned.restorePinned(['保存したクリップ','保存したクリップ','','x'.repeat(16385)]);assert.equal(pinned.snapshot(t+10000000).length,1);
+for(let i=0;i<10;i++){pinned.restorePinned(Array.from({length:10},(_,j)=>'固定'+j));}
+assert.equal(pinned.remember('overflow',t),undefined);assert.equal(pinned.snapshot(t).length,10);
+console.log('Pinned clips: survive expiry and capacity pressure, deduplicate, disable reads, unpin expiry, restore validation and full capacity: PASS');
